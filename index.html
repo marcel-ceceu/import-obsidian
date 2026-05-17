@@ -1,401 +1,1225 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sugestão de Compra</title>
-    <script src="https://cdn.jsdelivr.net/gh/wansleynery/SankhyaJX@main/jx.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; background: #f5f5f5; }
-        
-        .header { background: #2563eb; color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { font-size: 14px; font-weight: bold; }
-        .header-info { font-size: 10px; opacity: 0.8; }
-        
-        .filtros { background: #fff; padding: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #ddd; }
-        .filtros label { font-weight: bold; color: #333; }
-        .filtros select, .filtros input { padding: 5px 8px; border: 1px solid #ccc; font-size: 11px; border-radius: 3px; }
-        .filtros input[type="text"] { width: 180px; }
-        .btn { border: none; padding: 6px 12px; cursor: pointer; border-radius: 3px; font-size: 11px; }
-        .btn-primary { background: #2563eb; color: #fff; }
-        .btn-primary:hover { background: #1d4ed8; }
-        .btn-secondary { background: #6b7280; color: #fff; }
-        
-        .table-container { background: #fff; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        th { background: #333; color: #fff; padding: 8px 4px; text-align: center; font-size: 10px; cursor: pointer; user-select: none; white-space: nowrap; }
-        th:hover { background: #444; }
-        th .sort-icon { margin-left: 3px; font-size: 8px; }
-        th.sorted-asc, th.sorted-desc { background: #1d4ed8; }
-        td { border: 1px solid #e0e0e0; padding: 5px 4px; text-align: center; }
-        tr:nth-child(even) { background: #f9f9f9; }
-        tr:hover { background: #e8f4ff; }
-        .col-desc { text-align: left !important; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .col-num { text-align: right !important; padding-right: 8px !important; }
-        
-        .badge { padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold; display: inline-block; }
-        .badge-pedir { background: #dcfce7; color: #166534; }
-        .badge-analisar { background: #fef9c3; color: #854d0e; }
-        .badge-nao { background: #f3f4f6; color: #6b7280; }
-        .badge-alta { background: #fee2e2; color: #dc2626; }
-        .badge-normal { background: #e0e7ff; color: #4338ca; }
-        .badge-a { background: #dbeafe; color: #1d4ed8; font-weight: bold; }
-        .badge-b { background: #e0e7ff; color: #4338ca; }
-        .badge-c { background: #f3f4f6; color: #6b7280; }
-        
-        .loading { text-align: center; padding: 40px; color: #666; }
-        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #2563eb; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .footer { background: #fff; padding: 10px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; }
-        .footer-info { color: #666; font-size: 10px; }
-        .sugestao-valor { font-weight: bold; color: #2563eb; }
-        
-        /* Emoji clicável */
-        .btn-similar { cursor: pointer; font-size: 14px; margin-left: 4px; transition: transform 0.2s; }
-        .btn-similar:hover { transform: scale(1.3); }
-        
-        /* Modal */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-overlay.show { display: flex; }
-        .modal { background: #fff; border-radius: 8px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-        .modal-header { background: #2563eb; color: #fff; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h2 { font-size: 14px; font-weight: bold; }
-        .modal-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; }
-        .modal-close:hover { opacity: 0.8; }
-        .modal-body { padding: 15px; overflow-y: auto; max-height: calc(80vh - 100px); }
-        .modal-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 4px; padding: 10px; margin-bottom: 15px; font-size: 11px; }
-        .modal-info strong { color: #0369a1; }
-        .modal-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        .modal-table th { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 8px 6px; text-align: left; font-weight: bold; }
-        .modal-table td { border: 1px solid #e2e8f0; padding: 6px; }
-        .modal-table tr:hover { background: #f8fafc; }
-        .modal-table .col-num { text-align: right; }
-        .modal-footer { background: #f8fafc; padding: 10px 15px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
-        .modal-total { font-weight: bold; color: #2563eb; }
-        
-        .loading-modal { text-align: center; padding: 30px; color: #666; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#B53D2A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Claude Vault Sync · Pipeline Claude.ai → Obsidian</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --paper:   #F8F5F0;
+  --paper-2: #F1ECE3;
+  --ink:     #1A1614;
+  --ink-2:   #3A3530;
+  --mute:    #7A716A;
+  --line:    #D9D2C5;
+  --line-2:  #BDB4A6;
+  --accent:  #B53D2A;     /* carmesim / carimbo */
+  --accent-2:#8E2E1E;
+  --ok:      #2D6B3F;
+  --warn:    #B45309;
+  --shadow-1: 0 1px 0 var(--line);
+  --shadow-2: 0 4px 14px rgba(26, 22, 20, 0.06);
+  --shadow-3: 0 16px 40px rgba(26, 22, 20, 0.10);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Geist', -apple-system, sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Grain overlay (papel envelhecido) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+.app {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 56px 32px 80px;
+}
+
+/* ============ HEADER ============ */
+header {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 32px;
+  margin-bottom: 48px;
+  position: relative;
+  opacity: 0;
+  animation: fadeUp .8s ease forwards;
+}
+
+.brand-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.brand-mark {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--mute);
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  background: var(--paper-2);
+}
+
+.brand-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--mute);
+  text-align: right;
+  line-height: 1.5;
+}
+.brand-meta b { color: var(--ink-2); font-weight: 500; }
+
+h1.title {
+  font-family: 'Instrument Serif', serif;
+  font-size: 64px;
+  line-height: 1;
+  font-weight: 400;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+}
+h1.title em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.subtitle {
+  font-size: 18px;
+  color: var(--ink-2);
+  margin: 0;
+  max-width: 540px;
+}
+
+/* ============ STATUS BAR ============ */
+.status-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  margin-bottom: 56px;
+  opacity: 0;
+  animation: fadeUp .8s ease forwards;
+  animation-delay: .1s;
+}
+
+.status-cell {
+  padding: 14px 18px;
+  border-right: 1px solid var(--line);
+  position: relative;
+}
+.status-cell:last-child { border-right: 0; }
+
+.status-cell .num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--mute);
+  text-transform: uppercase;
+  display: block;
+}
+.status-cell .lbl {
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-top: 3px;
+}
+
+/* ============ PHASE CARDS ============ */
+.phase {
+  position: relative;
+  padding: 36px 36px 36px 28px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fadeUp .8s ease forwards;
+  transition: box-shadow .3s ease, transform .3s ease;
+}
+
+.phase:nth-of-type(1) { animation-delay: .2s; }
+.phase:nth-of-type(2) { animation-delay: .3s; }
+.phase:nth-of-type(3) { animation-delay: .4s; }
+
+.phase:hover {
+  box-shadow: var(--shadow-3);
+}
+
+.phase-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  margin-bottom: 24px;
+}
+
+.phase-num {
+  font-family: 'Instrument Serif', serif;
+  font-size: 88px;
+  line-height: 0.85;
+  font-weight: 400;
+  color: var(--accent);
+  font-style: italic;
+  letter-spacing: -0.04em;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.phase-meta {
+  flex: 1;
+  padding-top: 10px;
+}
+
+.phase-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--mute);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.phase h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: 32px;
+  font-weight: 400;
+  margin: 0 0 8px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.phase-desc {
+  color: var(--ink-2);
+  margin: 0;
+  font-size: 15.5px;
+}
+
+/* ============ STEPS ============ */
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 24px;
+  counter-reset: step;
+}
+
+.steps > li {
+  position: relative;
+  padding: 12px 0 12px 40px;
+  border-top: 1px solid var(--line);
+  counter-increment: step;
+  font-size: 14.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.steps > li:last-child { border-bottom: 1px solid var(--line); }
+
+.steps > li::before {
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--mute);
+  font-weight: 500;
+}
+
+.steps b { color: var(--ink); font-weight: 600; }
+.steps code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  background: var(--paper);
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--accent-2);
+}
+
+/* ============ BUTTONS ============ */
+.btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  padding: 12px 20px;
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.btn .arrow { transition: transform .2s ease; }
+.btn:hover .arrow { transform: translateX(3px); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-2);
+}
+.btn-ghost:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* ============ COMMAND BLOCK ============ */
+.cmd-wrap {
+  margin: 24px 0;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  position: relative;
+}
+
+.cmd-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid #2a2520;
+}
+
+.cmd-head .tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #8B857A;
+}
+
+.cmd-copy {
+  background: transparent;
+  border: 1px solid #3A3530;
+  color: var(--paper);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.cmd-copy:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.cmd-copy.ok {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.cmd-body {
+  padding: 18px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  word-break: break-all;
+  white-space: pre-wrap;
+  color: #E8E3DA;
+}
+
+.cmd-body .token-var { color: #F4B260; }
+.cmd-body .token-str { color: #9EC76B; }
+.cmd-body .token-cmd { color: #8FB7E8; }
+.cmd-body .placeholder { color: var(--accent); font-weight: 700; }
+
+/* ============ "WHAT IT DOES" ============ */
+.what-it-does {
+  margin: 20px 0 16px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+.what-it-does summary {
+  padding: 12px 18px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  user-select: none;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.what-it-does summary::-webkit-details-marker { display: none; }
+.what-it-does summary::after {
+  content: '+';
+  font-size: 18px;
+  color: var(--accent);
+  transition: transform .2s ease;
+}
+.what-it-does[open] summary::after { transform: rotate(45deg); }
+.what-it-does summary:hover { background: var(--paper-2); }
+
+.what-it-does ul {
+  list-style: none;
+  padding: 0 18px 18px;
+  margin: 0;
+  border-top: 1px dashed var(--line);
+}
+.what-it-does ul li {
+  padding: 7px 0 7px 20px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  position: relative;
+}
+.what-it-does ul li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+.what-it-does ul li:first-child { padding-top: 14px; }
+
+/* ============ VALIDATION CHECKS ============ */
+.checks {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 24px;
+}
+.checks li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dotted var(--line);
+  font-size: 14.5px;
+  color: var(--ink-2);
+}
+.checks li:last-child { border-bottom: 0; }
+.checks .icon {
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--ok);
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ok);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+.checks code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: var(--accent-2);
+}
+
+/* ============ ALTERNATIVE COMMAND (PS COMPLETO) ============ */
+.alt-cmd {
+  margin: 20px 0 0;
+  border: 1px dashed var(--line-2);
+  background: transparent;
+}
+.alt-cmd summary {
+  padding: 14px 18px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+.alt-cmd summary::-webkit-details-marker { display: none; }
+.alt-cmd summary::after {
+  content: '+';
+  color: var(--accent);
+  font-size: 18px;
+  transition: transform .2s ease;
+}
+.alt-cmd[open] summary::after { transform: rotate(45deg); }
+.alt-cmd summary:hover { background: var(--paper-2); color: var(--ink-2); }
+
+.alt-body {
+  padding: 0 18px 18px;
+  border-top: 1px dashed var(--line);
+}
+.alt-body p {
+  font-size: 13.5px;
+  color: var(--ink-2);
+  margin: 14px 0 14px;
+}
+.alt-body .steps {
+  margin: 0 0 18px;
+}
+.alt-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  background: var(--paper);
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  color: var(--accent-2);
+}
+
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+.script-size {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--mute);
+  margin-top: 10px;
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+/* ============ INFO NOTE ============ */
+.note {
+  border-left: 3px solid var(--accent);
+  background: var(--paper);
+  padding: 14px 18px;
+  margin: 20px 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.note strong { color: var(--ink); font-weight: 600; }
+
+/* ============ FOOTER ============ */
+footer {
+  margin-top: 64px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+  opacity: 0;
+  animation: fadeUp .8s ease forwards;
+  animation-delay: .5s;
+}
+
+.tech-info {
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+}
+.tech-info summary {
+  padding: 14px 18px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+}
+.tech-info summary::-webkit-details-marker { display: none; }
+.tech-info summary::after { content: '+'; color: var(--accent); font-size: 18px; }
+.tech-info[open] summary::after { content: '−'; }
+
+.tech-info dl {
+  margin: 0;
+  padding: 0 18px 18px;
+  border-top: 1px dashed var(--line);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.tech-info dt {
+  color: var(--mute);
+  margin-top: 14px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tech-info dd {
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  word-break: break-all;
+}
+
+.signature {
+  margin-top: 40px;
+  text-align: center;
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--mute);
+}
+
+/* ============ ANIMATIONS ============ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.dot-active {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
+  animation: pulse 2s ease infinite;
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 640px) {
+  .app { padding: 32px 20px 60px; }
+  h1.title { font-size: 44px; }
+  .phase { padding: 24px; }
+  .phase-head { gap: 16px; }
+  .phase-num { font-size: 64px; }
+  .phase h2 { font-size: 24px; }
+  .status-strip { grid-template-columns: 1fr; }
+  .status-cell { border-right: 0; border-bottom: 1px solid var(--line); }
+  .status-cell:last-child { border-bottom: 0; }
+  .brand-row { flex-direction: column; }
+  .brand-meta { text-align: left; }
+}
+</style>
 </head>
+
 <body>
+<div class="app">
 
-<div class="header">
-    <h1>📦 SUGESTÃO DE COMPRA</h1>
-    <span class="header-info" id="dtRef"></span>
-</div>
-
-<div class="filtros">
-    <label>Decisão:</label>
-    <select id="filtroDecisao">
-        <option value="">Todos</option>
-        <option value="PEDIR">PEDIR</option>
-        <option value="ANALISAR">ANALISAR</option>
-        <option value="NAO PEDIR">NÃO PEDIR</option>
-    </select>
-    
-    <label>ABC:</label>
-    <select id="filtroABC">
-        <option value="">Todos</option>
-        <option value="A">A</option>
-        <option value="B">B</option>
-        <option value="C">C</option>
-    </select>
-    
-    <label>Urgência:</label>
-    <select id="filtroUrgencia">
-        <option value="">Todos</option>
-        <option value="ALTA">ALTA</option>
-        <option value="NORMAL">NORMAL</option>
-    </select>
-    
-    <label>Buscar:</label>
-    <input type="text" id="filtroBusca" placeholder="Código, ref ou descrição...">
-    
-    <button class="btn btn-primary" onclick="aplicarFiltros()">Filtrar</button>
-    <button class="btn btn-secondary" onclick="limparFiltros()">Limpar</button>
-</div>
-
-<div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th data-col="CODPROD" onclick="ordenar('CODPROD')">CÓD <span class="sort-icon"></span></th>
-                <th data-col="REFFORN" onclick="ordenar('REFFORN')">REF <span class="sort-icon"></span></th>
-                <th data-col="DESCRPROD" onclick="ordenar('DESCRPROD')">DESCRIÇÃO <span class="sort-icon"></span></th>
-                <th data-col="MARCA" onclick="ordenar('MARCA')">MARCA <span class="sort-icon"></span></th>
-                <th data-col="ORG_ABC" onclick="ordenar('ORG_ABC')">ABC <span class="sort-icon"></span></th>
-                <th data-col="ORG_ETQAT" onclick="ordenar('ORG_ETQAT')">ETQ <span class="sort-icon"></span></th>
-                <th data-col="SIM_ETQAT" onclick="ordenar('SIM_ETQAT')">SIM <span class="sort-icon"></span></th>
-                <th data-col="ORG_ETQMIN" onclick="ordenar('ORG_ETQMIN')">MÍN <span class="sort-icon"></span></th>
-                <th data-col="SUGESTAO" onclick="ordenar('SUGESTAO')">SUG <span class="sort-icon"></span></th>
-                <th data-col="DECISAO" onclick="ordenar('DECISAO')">DECISÃO <span class="sort-icon"></span></th>
-                <th data-col="URGENCIA" onclick="ordenar('URGENCIA')">URG <span class="sort-icon"></span></th>
-            </tr>
-        </thead>
-        <tbody id="tbody">
-            <tr><td colspan="11" class="loading"><div class="loading-spinner"></div>Carregando...</td></tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="footer">
-    <span class="footer-info" id="totalRegistros">0 registros</span>
-    <span class="footer-info" id="totalFiltrados"></span>
-</div>
-
-<!-- Modal de Similares -->
-<div class="modal-overlay" id="modalSimilares" onclick="fecharModalFora(event)">
-    <div class="modal" onclick="event.stopPropagation()">
-        <div class="modal-header">
-            <h2>🔍 Produtos Similares</h2>
-            <button class="modal-close" onclick="fecharModal()">&times;</button>
-        </div>
-        <div class="modal-body" id="modalBody">
-            <div class="loading-modal">
-                <div class="loading-spinner"></div>
-                Carregando similares...
-            </div>
-        </div>
-        <div class="modal-footer" id="modalFooter">
-            <span id="modalQtdSimilares"></span>
-            <span class="modal-total" id="modalTotalEstoque"></span>
-        </div>
+  <!-- ============ HEADER ============ -->
+  <header>
+    <div class="brand-row">
+      <span class="brand-mark">CV · v5.0 MVP</span>
+      <div class="brand-meta">
+        Pipeline Claude.ai → Obsidian<br>
+        <b>PC Casa</b> · vault ClaudeMsgm
+      </div>
     </div>
+
+    <h1 class="title">Claude Vault<br><em>Sync</em></h1>
+    <p class="subtitle">Manual operacional para importar suas conversas do Claude.ai no Obsidian em segundos, sem duplicatas, com limpeza automática dos blocos quebrados.</p>
+  </header>
+
+  <!-- ============ STATUS STRIP ============ -->
+  <div class="status-strip">
+    <div class="status-cell">
+      <span class="num">Fase 01</span>
+      <div class="lbl">Download do export</div>
+    </div>
+    <div class="status-cell">
+      <span class="num">Fase 02</span>
+      <div class="lbl"><span class="dot-active"></span>Executar pipeline</div>
+    </div>
+    <div class="status-cell">
+      <span class="num">Fase 03</span>
+      <div class="lbl">Validar no Obsidian</div>
+    </div>
+  </div>
+
+  <!-- ============ PHASE 01 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <div class="phase-num">01</div>
+      <div class="phase-meta">
+        <div class="phase-tag">Etapa manual · ~5 min</div>
+        <h2>Download do export</h2>
+        <p class="phase-desc">Solicite à Anthropic o ZIP com todas as suas conversas. O link chega por email em alguns minutos.</p>
+      </div>
+    </div>
+
+    <ol class="steps">
+      <li>Acessar <b>claude.ai</b> no navegador, logado.</li>
+      <li>Clicar nas <b>iniciais</b> (canto inferior esquerdo) → <b>Settings</b>.</li>
+      <li>Menu lateral → <b>Privacy</b> → botão <b>Export data</b>.</li>
+      <li>Confirmar. A Anthropic envia o link por email em <b>5–15 min</b>.</li>
+      <li>Baixar o ZIP recebido (nome <code>data-...-batch-0000.zip</code>). Deixar em <code>Downloads</code> — o pipeline acha sozinho.</li>
+    </ol>
+
+    <div class="btn-row">
+      <a href="https://claude.ai/settings/data-privacy-controls" target="_blank" rel="noopener" class="btn">
+        Abrir Privacy Settings <span class="arrow">→</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ============ PHASE 02 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <div class="phase-num">02</div>
+      <div class="phase-meta">
+        <div class="phase-tag">Etapa automatizada · ~3 segundos</div>
+        <h2>Executar pipeline</h2>
+        <p class="phase-desc">Um único comando faz todo o trabalho: descompacta o ZIP, sincroniza só o que é novo, limpa thinking em inglês, gera log.</p>
+      </div>
+    </div>
+
+    <details class="what-it-does" open>
+      <summary>O que o comando faz</summary>
+      <ul>
+        <li>Detecta o ZIP mais recente do Claude em <code>Downloads</code> (pelo conteúdo, não pelo nome).</li>
+        <li>Extrai pra <code>Desktop\claude-export\conversations.json</code>.</li>
+        <li>Aplica patch de performance: pula tagging via Ollama/keyword (de ~10h para ~1s).</li>
+        <li>Roda <code>claude-vault sync</code> incremental: UUID + SQLite identifica New / Updated / Unchanged sem duplicar.</li>
+        <li>Limpa só os <code>.md</code> que entraram agora: remove blocos "This block is not supported" e parágrafos de thinking em inglês, normaliza UTF-8 sem BOM.</li>
+        <li>Gera log <code>LOG-SYNC[ddmmaa-hhmm].txt</code> no Desktop e abre no Notepad ao final.</li>
+      </ul>
+    </details>
+
+    <div class="cmd-wrap">
+      <div class="cmd-head">
+        <span class="tag">PowerShell · One-liner</span>
+        <button class="cmd-copy" id="btn-copy" type="button">Copiar comando</button>
+      </div>
+      <div class="cmd-body" id="cmd-text"><span class="token-var">$d</span>=<span class="token-str">'C:\1. Trabalho'</span>;<span class="token-cmd">if</span>(!(Test-Path <span class="token-var">$d</span>)){md <span class="token-var">$d</span>|Out-Null};<span class="token-var">$t</span>=<span class="token-str">"<span class="token-var">$d</span>\Clean-ClaudeVault.ps1"</span>;iwr <span class="placeholder">'https://raw.githubusercontent.com/marcel-ceceu/import-obsidian/main/Clean-ClaudeVault.ps1'</span> -OutFile <span class="token-var">$t</span> -UseBasicParsing;&amp; powershell -ExecutionPolicy Bypass -File <span class="token-var">$t</span></div>
+    </div>
+
+    <div class="note" style="border-left-color: var(--ok);">
+      <strong>✓ Hospedagem:</strong> o script é baixado de <code>github.com/marcel-ceceu/import-obsidian</code> (repo público). Versão atualizada automaticamente sempre que você editar e fizer push.
+    </div>
+
+    <details class="alt-cmd">
+      <summary>Alternativa: rodar o PowerShell completo offline</summary>
+      <div class="alt-body">
+        <p>Sem internet, prefere auditar o código antes de rodar, ou enquanto a URL de hospedagem não está definida? Cole o PowerShell completo num arquivo <code>.ps1</code> e execute manualmente.</p>
+        <ol class="steps">
+          <li>Clicar em <b>Copiar PowerShell completo</b> abaixo.</li>
+          <li>Abrir <b>Notepad</b> (ou VSCode), colar (<code>Ctrl+V</code>), salvar como <code>Clean-ClaudeVault.ps1</code> em <code>C:\1. Trabalho\</code> (codificação UTF-8).</li>
+          <li>No PowerShell, executar: <code>powershell -ExecutionPolicy Bypass -File "C:\1. Trabalho\Clean-ClaudeVault.ps1"</code></li>
+        </ol>
+        <button class="btn btn-block" id="btn-copy-full" type="button">
+          Copiar PowerShell completo <span class="arrow">↓</span>
+        </button>
+        <div class="script-size" id="script-size">Clean-ClaudeVault.ps1 · v5.0 MVP</div>
+      </div>
+    </details>
+
+    <ol class="steps">
+      <li>Abrir <b>PowerShell</b> (atalho: <code>Win + X</code> → <i>Windows PowerShell</i>).</li>
+      <li>Clicar em <b>Copiar comando</b> acima.</li>
+      <li>Colar no PowerShell (<code>Ctrl + V</code>) e pressionar <b>Enter</b>.</li>
+      <li>Aguardar. O Notepad abre automaticamente com o log no final.</li>
+    </ol>
+  </section>
+
+  <!-- ============ PHASE 03 ============ -->
+  <section class="phase">
+    <div class="phase-head">
+      <div class="phase-num">03</div>
+      <div class="phase-meta">
+        <div class="phase-tag">Validação · ~30 segundos</div>
+        <h2>Validar no Obsidian</h2>
+        <p class="phase-desc">No Notepad que abriu sozinho, confirme os indicadores. Depois, abra o Obsidian e teste a busca.</p>
+      </div>
+    </div>
+
+    <ul class="checks">
+      <li><span class="icon">✓</span>Linha "<code>[OK] Sync concluido em</code>" com tempo abaixo de 5 segundos.</li>
+      <li><span class="icon">✓</span>"<code>diferenca: +N</code>" mostra quantos arquivos novos entraram.</li>
+      <li><span class="icon">✓</span>"<code>Ainda com bloco sujo (recent): 0</code>" — limpeza funcionou.</li>
+      <li><span class="icon">✓</span>Nenhuma linha começando com <code>[X]</code> ou <code>[ABORT]</code>.</li>
+    </ul>
+
+    <div class="btn-row">
+      <a href="obsidian://open?vault=ClaudeMsgm" class="btn">
+        Abrir vault no Obsidian <span class="arrow">→</span>
+      </a>
+      <a href="#" onclick="event.preventDefault(); navigator.clipboard.writeText('Ctrl+Shift+F'); alert('Atalho copiado: Ctrl+Shift+F (busca global no Obsidian)');" class="btn btn-ghost">
+        Buscar full-text
+      </a>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer>
+    <details class="tech-info">
+      <summary>Informações técnicas · caminhos no disco</summary>
+      <dl>
+        <dt>Script local</dt>
+        <dd>C:\1. Trabalho\Clean-ClaudeVault.ps1</dd>
+
+        <dt>Vault Obsidian</dt>
+        <dd>%USERPROFILE%\Documents\ClaudeMsgm</dd>
+
+        <dt>JSON extraído</dt>
+        <dd>%USERPROFILE%\Desktop\claude-export\conversations.json</dd>
+
+        <dt>Repo claude-vault</dt>
+        <dd>%USERPROFILE%\claude-vault</dd>
+
+        <dt>Logs</dt>
+        <dd>%USERPROFILE%\Desktop\LOG-SYNC[ddmmaa-hhmm].txt</dd>
+
+        <dt>Backup tagging.py original</dt>
+        <dd>%USERPROFILE%\claude-vault\claude_vault\tagging.py.bak</dd>
+
+        <dt>Rollback para regerar tags via Ollama</dt>
+        <dd>Copy-Item tagging.py.bak tagging.py -Force &amp;&amp; ollama serve &amp;&amp; claude-vault retag --force</dd>
+      </dl>
+    </details>
+
+    <div class="signature">
+      &mdash; Fase 1 do projeto Claude Vault PWA &mdash;
+    </div>
+  </footer>
+
 </div>
+
+<!-- ========= POWERSHELL COMPLETO EMBUTIDO (v5.0 MVP) ========= -->
+<script type="text/plain" id="ps-script"># ============================================================
+# Clean-ClaudeVault.ps1  -  v5.0 MVP
+# ------------------------------------------------------------
+# Pipeline completo Claude.ai -> Obsidian (PC casa)
+#
+# v5.0 MVP: limpeza minima
+#   - Remove SO blocos "This block is not supported on your current device yet"
+#   - NAO remove thinking em ingles (preservado pra busca/contexto)
+# v4.1: fix encoding UTF-8 (resolve crash do rich/emoji do claude-vault
+#       no Windows legacy console quando rodado via powershell -File)
+#
+# PASSOS:
+#   PRE   : valida vault, CLI, tagging.py
+#   0     : detecta ZIP do Claude em Downloads + extrai
+#   A     : aplica patch tagging.py (idempotente, skip se ja patched)
+#   B     : claude-vault sync (incremental, UUID-based, sem duplicata)
+#   C     : limpa .md modificados pelo sync (blocks + thinking ingles)
+#   POS   : validacao final + log em Desktop
+#
+# Flags opcionais:
+#   -SkipPatch  : nao re-aplica patch (assume que ja esta)
+#   -SkipClean  : pula limpeza dos .md
+#
+# Pre-requisitos (instalados uma vez no PC casa):
+#   - Python 3.13 + Git
+#   - Repo claude-vault clonado em %USERPROFILE%\claude-vault
+#   - venv criado + pip install -e .
+#   - Vault Obsidian em %USERPROFILE%\Documents\ClaudeMsgm
+#
+# Rollback do patch (pra regenerar tags via Ollama):
+#   Copy-Item "%USERPROFILE%\claude-vault\claude_vault\tagging.py.bak" `
+#             "%USERPROFILE%\claude-vault\claude_vault\tagging.py" -Force
+#   ollama serve  (em outra janela)
+#   claude-vault retag --force
+# ============================================================
+
+[CmdletBinding()]
+param(
+    [switch]$SkipPatch,
+    [switch]$SkipClean
+)
+
+$ErrorActionPreference = "Continue"
+
+# --- Encoding fix (resolve crash do rich/emoji no Windows legacy console) ---
+# Forca o stdout do Python pra UTF-8, evitando UnicodeEncodeError em cp1252
+$env:PYTHONIOENCODING = "utf-8"
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+} catch {}
+
+# --- Caminhos (PC casa hardcoded) ---
+$VaultPath       = "$env:USERPROFILE\Documents\ClaudeMsgm"
+$ConvDir         = Join-Path $VaultPath "conversations"
+$DownloadsPath   = "$env:USERPROFILE\Downloads"
+$ExportDir       = "$env:USERPROFILE\Desktop\claude-export"
+$ConvJsonPath    = "$ExportDir\conversations.json"
+$RepoPath        = "$env:USERPROFILE\claude-vault"
+$VenvActivate    = "$RepoPath\venv\Scripts\Activate.ps1"
+$ClaudeVaultExe  = "$RepoPath\venv\Scripts\claude-vault.exe"
+$TaggingPy       = "$RepoPath\claude_vault\tagging.py"
+$TaggingPyBak    = "$RepoPath\claude_vault\tagging.py.bak"
+
+# --- Log ---
+$ts        = Get-Date -Format "ddMMyy-HHmm"
+$LogPath   = "$env:USERPROFILE\Desktop\LOG-SYNC$ts.txt"
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Write-Log {
+    param([string]$Msg, [string]$Color = "White")
+    Write-Host $Msg -ForegroundColor $Color
+    $Msg | Out-File -FilePath $LogPath -Append -Encoding UTF8
+}
+
+Write-Log "===== Clean-ClaudeVault v5.0 MVP  -  $ts =====" Cyan
+Write-Log ""
+
+# ============================================================
+# PRE-FLIGHT
+# ============================================================
+Write-Log "[PRE-FLIGHT] Validando..." Cyan
+$preflightOk = $true
+
+if (-not (Test-Path $VaultPath)) {
+    Write-Log "  [X] Vault nao encontrado: $VaultPath" Red
+    $preflightOk = $false
+} else {
+    Write-Log "  [OK] Vault: $VaultPath" Green
+}
+if (-not (Test-Path $ClaudeVaultExe)) {
+    Write-Log "  [X] claude-vault.exe nao encontrado" Red
+    $preflightOk = $false
+} else {
+    Write-Log "  [OK] CLI: $ClaudeVaultExe" Green
+}
+if (-not (Test-Path $TaggingPy)) {
+    Write-Log "  [X] tagging.py nao encontrado" Red
+    $preflightOk = $false
+} else {
+    Write-Log "  [OK] tagging.py existe" Green
+}
+if (-not (Test-Path $DownloadsPath)) {
+    Write-Log "  [X] Downloads nao encontrado" Red
+    $preflightOk = $false
+} else {
+    Write-Log "  [OK] Downloads: $DownloadsPath" Green
+}
+
+if (-not $preflightOk) {
+    Write-Log "`n[ABORT] Pre-requisitos faltando. Veja o log." Red
+    Start-Process notepad.exe $LogPath
+    exit 1
+}
+Write-Log ""
+
+# ============================================================
+# PASSO 0  -  Detectar e extrair ZIP do Claude
+# ============================================================
+Write-Log "[PASSO 0] Detectando ZIP do Claude em Downloads..." Cyan
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$zip = Get-ChildItem "$DownloadsPath\*.zip" -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    ForEach-Object {
+        try {
+            $h = [IO.Compression.ZipFile]::OpenRead($_.FullName)
+            $hit = $h.Entries | Where-Object Name -eq 'conversations.json'
+            $h.Dispose()
+            if ($hit) { $_ }
+        } catch {}
+    } | Select-Object -First 1
+
+if (-not $zip) {
+    Write-Log "  [X] Nenhum ZIP com conversations.json encontrado em $DownloadsPath" Red
+    Write-Log "      Solicite o export em claude.ai -> Settings -> Privacy -> Export data" Yellow
+    Write-Log "      Apos receber o email, baixe o ZIP em Downloads e re-execute" Yellow
+    Start-Process notepad.exe $LogPath
+    exit 2
+}
+
+$zipMb = [math]::Round($zip.Length / 1MB, 2)
+Write-Log "  [OK] ZIP detectado: $($zip.Name) ($zipMb MB, $($zip.LastWriteTime))" Green
+
+if (Test-Path $ExportDir) {
+    Remove-Item $ExportDir -Recurse -Force
+}
+Expand-Archive -Path $zip.FullName -DestinationPath $ExportDir -Force
+
+if (Test-Path $ConvJsonPath) {
+    $jsonMb = [math]::Round((Get-Item $ConvJsonPath).Length / 1MB, 2)
+    Write-Log "  [OK] conversations.json extraido: $jsonMb MB" Green
+} else {
+    Write-Log "  [X] Falha ao extrair conversations.json" Red
+    Start-Process notepad.exe $LogPath
+    exit 3
+}
+Write-Log ""
+
+# ============================================================
+# PASSO A  -  Patch tagging.py (idempotente)
+# ------------------------------------------------------------
+# Substitui OfflineTagGenerator por versao vazia.
+# Razao: sync original chama generate_metadata() pra cada conv,
+# que executa LLM (lento) OU keyword fallback (tambem lento).
+# Com patch: sync vira ~1s/100 conversations.
+# Pra regerar tags depois, rollback + retag separado.
+# ============================================================
+if (-not $SkipPatch) {
+    Write-Log "[PASSO A] Verificando patch tagging.py..." Cyan
+    $patchMarker = "PATCHED tagging.py - skip all tagging during sync"
+    $current = Get-Content $TaggingPy -Raw -ErrorAction SilentlyContinue
+    $alreadyPatched = $current -and ($current -match $patchMarker)
+
+    if ($alreadyPatched) {
+        Write-Log "  [OK] tagging.py ja esta patched" Green
+    } else {
+        if (-not (Test-Path $TaggingPyBak)) {
+            Copy-Item $TaggingPy $TaggingPyBak -Force
+            Write-Log "  [OK] Backup criado: $TaggingPyBak" Green
+        }
+
+        $patchContent = @'
+"""PATCHED tagging.py - skip all tagging during sync for performance.
+
+Restaurar original: Copy-Item tagging.py.bak tagging.py -Force
+Regerar tags depois: claude-vault retag --force (com Ollama ligado, apos restore)
+"""
+from typing import List
+from .models import Conversation
+
+
+class OfflineTagGenerator:
+    """PATCHED: returns empty metadata to skip tagging during sync."""
+
+    def __init__(self):
+        pass
+
+    def is_available(self) -> bool:
+        return False
+
+    def generate_metadata(self, conversation: Conversation) -> dict:
+        return {"tags": [], "summary": ""}
+
+    def _fallback_metadata(self, conversation: Conversation) -> dict:
+        return {"tags": [], "summary": ""}
+'@
+        Set-Content -Path $TaggingPy -Value $patchContent -Encoding UTF8
+        Write-Log "  [OK] tagging.py patched" Green
+    }
+} else {
+    Write-Log "[PASSO A] Patch - SKIPPED (-SkipPatch)" Yellow
+}
+Write-Log ""
+
+# ============================================================
+# PASSO B  -  Sync incremental
+# ------------------------------------------------------------
+# UUID + SQLite tracking do claude-vault classifica em 4 buckets:
+#   New / Updated / Recreated / Unchanged
+# Zero risco de duplicata (nome do .md = UUID + slug deterministico)
+# ============================================================
+Write-Log "[PASSO B] Sync incremental..." Cyan
+
+$antes = (Get-ChildItem $ConvDir -Filter *.md -File -ErrorAction SilentlyContinue).Count
+$syncStart = Get-Date
+
+try {
+    & $VenvActivate
+    Push-Location $VaultPath
+    & $ClaudeVaultExe sync $ConvJsonPath 2>&1 | ForEach-Object {
+        Write-Log "  $_"
+    }
+    Pop-Location
+} catch {
+    Write-Log "  [X] Falha no sync: $_" Red
+    Start-Process notepad.exe $LogPath
+    exit 4
+}
+
+$syncDur = [math]::Round(((Get-Date) - $syncStart).TotalSeconds, 1)
+$depois = (Get-ChildItem $ConvDir -Filter *.md -File).Count
+$diff = $depois - $antes
+
+Write-Log ""
+Write-Log "  [OK] Sync concluido em $syncDur s" Green
+Write-Log "  .md antes: $antes  |  depois: $depois  |  diferenca: +$diff" Green
+Write-Log ""
+
+# ============================================================
+# PASSO C  -  Limpeza MVP dos .md modificados pelo sync
+# ------------------------------------------------------------
+# Cutoff = inicio do sync. So toca em arquivos novos/atualizados.
+# Remove APENAS:
+#  - blocos ```\nThis block is not supported on your current device yet.\n```
+# Preserva tudo o resto, incluindo thinking em ingles.
+# Normaliza: UTF-8 sem BOM, 3+ linhas em branco -> 2
+# ============================================================
+if (-not $SkipClean) {
+    Write-Log "[PASSO C] Limpando blocos quebrados (MVP)..." Cyan
+
+    $mdFiles = Get-ChildItem $ConvDir -Filter *.md -File |
+        Where-Object { $_.LastWriteTime -ge $syncStart.AddSeconds(-5) }
+    Write-Log "  Arquivos a varrer: $($mdFiles.Count)" White
+
+    $rxBlockUnsupported = '(?ms)^``` *\r?\nThis block is not supported on your current device yet\.\s*\r?\n``` *\r?\n?'
+
+    $filesChanged   = 0
+    $blocksRemoved  = 0
+
+    foreach ($f in $mdFiles) {
+        try {
+            $content = [System.IO.File]::ReadAllText($f.FullName, $utf8NoBom)
+        } catch { continue }
+        $original = $content
+
+        # Remove blocos "This block is not supported"
+        $m1 = [regex]::Matches($content, $rxBlockUnsupported)
+        if ($m1.Count -gt 0) {
+            $content = [regex]::Replace($content, $rxBlockUnsupported, '')
+            $blocksRemoved += $m1.Count
+        }
+
+        # Normaliza: 3+ linhas em branco -> 2
+        $content = [regex]::Replace($content, '(\r?\n){3,}', "`r`n`r`n")
+
+        if ($content -ne $original) {
+            try {
+                [System.IO.File]::WriteAllText($f.FullName, $content, $utf8NoBom)
+                $filesChanged++
+            } catch {}
+        }
+    }
+
+    Write-Log "  Arquivos modificados : $filesChanged / $($mdFiles.Count)" Green
+    Write-Log "  Blocos removidos     : $blocksRemoved" Green
+} else {
+    Write-Log "[PASSO C] Limpeza - SKIPPED (-SkipClean)" Yellow
+}
+Write-Log ""
+
+# ============================================================
+# POS-FLIGHT  -  Validacao
+# ============================================================
+Write-Log "[POS-FLIGHT] Validacao..." Cyan
+
+$totalFinal = (Get-ChildItem $ConvDir -Filter *.md -File).Count
+
+$stillDirty = 0
+Get-ChildItem $ConvDir -Filter *.md -File |
+    Where-Object { $_.LastWriteTime -ge $syncStart.AddSeconds(-5) } |
+    ForEach-Object {
+        try {
+            if ([System.IO.File]::ReadAllText($_.FullName, $utf8NoBom) -match 'This block is not supported') {
+                $stillDirty++
+            }
+        } catch {}
+    }
+
+Write-Log "  Total .md no vault           : $totalFinal" Green
+$dirtyColor = if ($stillDirty -eq 0) { "Green" } else { "Yellow" }
+Write-Log "  Ainda com bloco sujo (recent): $stillDirty" $dirtyColor
+Write-Log ""
+Write-Log "===== FIM  -  Log em $LogPath =====" Cyan
+
+Start-Process notepad.exe $LogPath
+exit 0
+</script>
 
 <script>
-var VSS = null;
-var dadosOriginais = [];
-var dadosFiltrados = [];
-var colunaOrdenada = 'RANKI';
-var ordemAsc = true;
+// Copy command to clipboard
+const btn = document.getElementById('btn-copy');
+const cmdEl = document.getElementById('cmd-text');
 
-function carregarDados() {
-    var sql = "WITH CTE_BASE AS ( " +
-        "SELECT ITE.CODPROD, PRO.REFFORN, PRO.CODIGO, PRO.MARCA, PRO.QTDAGRUPAMENTOMTZ, PRO.DESCRPROD, PRO.COMPLDESC, PRO.CODGRUPOPROD, PRO.DESCRGRUPOPROD, PRO.AD_COTADMF, PRO.AD_CATCOMPRA, PRO.AD_STATUSREP, " +
-        "NVL(ABC.RANKING_QTDPED, 0) AS RANKI, NVL(ABC.QTDPEDVENLIQ_12M, 0) AS ORG_PED12M, ABC.ABC_PED AS ORG_ABC, " +
-        "NVL(MED.ITEVENLIQ_12M, 0) AS ORG_ITE12M, NVL(MED.MEDMES, 0) AS ORG_MEDMES, NVL(MED.ETQMIN, 0) AS ORG_ETQMIN, NVL(MED.ETQMED, 0) AS ORG_ETQMED, NVL(MED.ETQMAX, 0) AS ORG_ETQMAX, " +
-        "NVL(EST.ESTOQUE, 0) AS ORG_ETQAT, " +
-        "NVL(MEDSIM.SIM_PEDLIQ, 0) AS SIM_PED12M, NVL(MEDSIM.SIM_MEDMES, 0) AS SIM_MEDMES, NVL(MEDSIM.SIM_ETQMIN, 0) AS SIM_ETQMIN, NVL(MEDSIM.SIM_ETQMED, 0) AS SIM_ETQMED, NVL(MEDSIM.SIM_ETQMAX, 0) AS SIM_ETQMAX, " +
-        "NVL(ESTSIM.SUM_ESTOQUE, 0) AS SIM_ETQAT, NVL(ESTSIM.QTD_MARCAEST, 0) AS SIM_MARCAETQ " +
-        "FROM AE1_2509_ITEMOVENTINICIAL ITE " +
-        "INNER JOIN AE0_2508_PRODUTOCOMPLETO PRO ON PRO.CODPROD = ITE.CODPROD " +
-        "LEFT JOIN AE1_2509_ITEABC ABC ON ABC.CODPROD = ITE.CODPROD " +
-        "LEFT JOIN AE1_2509_MEDMES MED ON MED.CODPROD = ITE.CODPROD " +
-        "LEFT JOIN AE1_2508_TGFEST EST ON EST.CODPROD = ITE.CODPROD " +
-        "LEFT JOIN AE1_2509_MEDMES_SIM MEDSIM ON MEDSIM.COMPLDESC = PRO.COMPLDESC " +
-        "LEFT JOIN AE1_2509_ESTSIM ESTSIM ON ESTSIM.COMPLDESC = PRO.COMPLDESC) " +
-        "SELECT SYSDATE AS DTREF, B.CODPROD, B.REFFORN, B.CODIGO, B.MARCA, B.COMPLDESC, B.DESCRPROD, B.CODGRUPOPROD, B.DESCRGRUPOPROD, B.RANKI, B.ORG_PED12M, B.ORG_ABC, B.ORG_ITE12M, B.SIM_PED12M, B.ORG_MEDMES, B.SIM_MEDMES, B.ORG_ETQAT, B.SIM_ETQAT, B.SIM_MARCAETQ, B.ORG_ETQMIN, B.ORG_ETQMED, B.ORG_ETQMAX, B.SIM_ETQMIN, B.SIM_ETQMED, B.SIM_ETQMAX, B.AD_COTADMF, B.AD_CATCOMPRA, B.AD_STATUSREP, " +
-        "CASE WHEN NVL(B.AD_STATUSREP, 0) = 2 OR NVL(B.AD_CATCOMPRA, 0) IN (1, 3) THEN 'INELEGIVEL' ELSE 'ELEGIVEL' END AS SELECAO, " +
-        "CASE WHEN B.ORG_ETQAT >= B.ORG_ETQMIN OR B.ORG_ABC IS NULL THEN 'NAO PEDIR' WHEN B.ORG_ETQAT < B.ORG_ETQMIN THEN CASE B.ORG_ABC WHEN 'A' THEN 'PEDIR' WHEN 'B' THEN CASE WHEN B.SIM_ETQAT < B.SIM_ETQMIN THEN 'PEDIR' ELSE 'NAO PEDIR' END WHEN 'C' THEN CASE WHEN B.SIM_ETQAT < B.SIM_ETQMIN THEN 'ANALISAR' ELSE 'NAO PEDIR' END ELSE 'ANALISAR' END ELSE 'ANALISAR' END AS DECISAO, " +
-        "CASE WHEN NVL(B.AD_STATUSREP, 0) = 2 OR NVL(B.AD_CATCOMPRA, 0) IN (1, 3) THEN 'NULO' WHEN B.ORG_ETQAT > B.ORG_ETQMIN THEN 'NULO' WHEN B.ORG_ETQAT = 0 AND B.SIM_ETQAT = 0 THEN CASE WHEN NVL(B.ORG_ABC, 'Z') IN ('A', 'B') THEN 'ALTA' ELSE 'NORMAL' END WHEN B.ORG_ETQAT < B.ORG_ETQMIN AND B.ORG_ETQAT > 0 AND B.SIM_ETQAT < B.SIM_ETQMIN AND B.SIM_ETQAT > 0 THEN CASE WHEN NVL(B.ORG_ABC, 'Z') IN ('A', 'B') THEN 'ALTA' ELSE 'NORMAL' END ELSE 'NORMAL' END AS URGENCIA, " +
-        "CASE WHEN B.ORG_ETQAT >= B.ORG_ETQMIN OR B.ORG_ABC IS NULL THEN 0 WHEN B.ORG_ABC = 'A' THEN GREATEST(CEIL(CASE WHEN B.ORG_ETQMED > 0 THEN B.ORG_ETQMED ELSE B.ORG_MEDMES * 2 END - B.ORG_ETQAT), 0) WHEN B.ORG_ABC IN ('B', 'C') THEN GREATEST(CEIL(CASE WHEN B.ORG_ETQMIN > 0 THEN B.ORG_ETQMIN ELSE B.ORG_MEDMES END - B.ORG_ETQAT), 0) ELSE 0 END AS SUGESTAO, " +
-        "B.QTDAGRUPAMENTOMTZ FROM CTE_BASE B ORDER BY NULLIF(B.RANKI, 0) NULLS LAST, B.COMPLDESC";
-
-    JX.consultar(sql).then(function(resultado) {
-        dadosOriginais = resultado || [];
-        dadosFiltrados = dadosOriginais.slice();
-        if (dadosOriginais.length > 0 && dadosOriginais[0].DTREF) {
-            document.getElementById('dtRef').textContent = 'Ref: ' + formatarData(dadosOriginais[0].DTREF);
-        }
-        renderizarTabela();
-        atualizarContadores();
-    }).catch(function(erro) {
-        document.getElementById('tbody').innerHTML = '<tr><td colspan="11" style="color:red;padding:20px;">Erro: ' + erro + '</td></tr>';
-    });
-}
-
-function renderizarTabela() {
-    var tbody = document.getElementById('tbody');
-    if (dadosFiltrados.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="padding:20px;color:#666;">Nenhum registro</td></tr>';
-        return;
-    }
-    var html = '';
-    for (var i = 0; i < dadosFiltrados.length; i++) {
-        var r = dadosFiltrados[i];
-        var simEtq = Number(r.SIM_ETQAT) || 0;
-        var emojiSimilar = '';
-        
-        // Emoji clicável SOMENTE se SIM_ETQAT > 0
-        if (simEtq > 0) {
-            emojiSimilar = '<span class="btn-similar" onclick="abrirModalSimilares(\'' + escapeHtml(r.COMPLDESC) + '\', ' + r.CODPROD + ')" title="Ver produtos similares">🔍</span>';
-        }
-        
-        html += '<tr>' +
-            '<td>' + (r.CODPROD || '') + '</td>' +
-            '<td>' + (r.REFFORN || '') + '</td>' +
-            '<td class="col-desc" title="' + escapeHtml(r.DESCRPROD || '') + '">' + (r.DESCRPROD || '') + '</td>' +
-            '<td>' + (r.MARCA || '') + '</td>' +
-            '<td>' + getBadgeABC(r.ORG_ABC) + '</td>' +
-            '<td class="col-num">' + fmtNum(r.ORG_ETQAT) + '</td>' +
-            '<td class="col-num">' + fmtNum(simEtq) + emojiSimilar + '</td>' +
-            '<td class="col-num">' + fmtNum(r.ORG_ETQMIN) + '</td>' +
-            '<td class="col-num">' + (r.SUGESTAO > 0 ? '<span class="sugestao-valor">' + fmtNum(r.SUGESTAO) + '</span>' : '0') + '</td>' +
-            '<td>' + getBadgeDecisao(r.DECISAO) + '</td>' +
-            '<td>' + getBadgeUrgencia(r.URGENCIA) + '</td>' +
-            '</tr>';
-    }
-    tbody.innerHTML = html;
-}
-
-// ==================== MODAL DE SIMILARES ====================
-
-function abrirModalSimilares(compldesc, codprodAtual) {
-    var modal = document.getElementById('modalSimilares');
-    var modalBody = document.getElementById('modalBody');
-    
-    // Mostrar modal com loading
-    modal.classList.add('show');
-    modalBody.innerHTML = '<div class="loading-modal"><div class="loading-spinner"></div>Carregando similares...</div>';
-    document.getElementById('modalQtdSimilares').textContent = '';
-    document.getElementById('modalTotalEstoque').textContent = '';
-    
-    // Query para buscar produtos similares pelo COMPLDESC
-    var sqlSimilares = "SELECT " +
-        "PRO.CODPROD, " +
-        "PRO.CODIGO, " +
-        "PRO.REFFORN, " +
-        "PRO.MARCA, " +
-        "PRO.DESCRPROD, " +
-        "PRO.COMPLDESC, " +
-        "NVL(EST.ESTOQUE, 0) AS ESTOQUE " +
-        "FROM AE0_2508_PRODUTOCOMPLETO PRO " +
-        "LEFT JOIN AE1_2508_TGFEST EST ON EST.CODPROD = PRO.CODPROD " +
-        "WHERE PRO.COMPLDESC = '" + compldesc.replace(/'/g, "''") + "' " +
-        "ORDER BY EST.ESTOQUE DESC NULLS LAST, PRO.MARCA";
-    
-    JX.consultar(sqlSimilares).then(function(similares) {
-        if (!similares || similares.length === 0) {
-            modalBody.innerHTML = '<div style="padding:20px;text-align:center;color:#666;">Nenhum produto similar encontrado.</div>';
-            return;
-        }
-        
-        var totalEstoque = 0;
-        var html = '<div class="modal-info">' +
-            '<strong>Referência Similar:</strong> ' + escapeHtml(compldesc) + '<br>' +
-            '<strong>Produto consultado:</strong> Código ' + codprodAtual +
-            '</div>';
-        
-        html += '<table class="modal-table">' +
-            '<thead><tr>' +
-            '<th>Código</th>' +
-            '<th>Referência</th>' +
-            '<th>Descrição</th>' +
-            '<th>Marca</th>' +
-            '<th style="text-align:right;">Estoque</th>' +
-            '</tr></thead><tbody>';
-        
-        for (var i = 0; i < similares.length; i++) {
-            var s = similares[i];
-            var estoque = Number(s.ESTOQUE) || 0;
-            totalEstoque += estoque;
-            
-            // Destacar o produto atual
-            var destaque = (s.CODPROD == codprodAtual) ? ' style="background:#fef9c3;"' : '';
-            var marcador = (s.CODPROD == codprodAtual) ? ' ⭐' : '';
-            
-            html += '<tr' + destaque + '>' +
-                '<td>' + (s.CODPROD || '') + marcador + '</td>' +
-                '<td>' + (s.REFFORN || s.CODIGO || '') + '</td>' +
-                '<td>' + escapeHtml(s.DESCRPROD || '') + '</td>' +
-                '<td>' + (s.MARCA || '') + '</td>' +
-                '<td class="col-num">' + fmtNum(estoque) + '</td>' +
-                '</tr>';
-        }
-        
-        html += '</tbody></table>';
-        
-        modalBody.innerHTML = html;
-        document.getElementById('modalQtdSimilares').textContent = similares.length + ' produto(s) similar(es)';
-        document.getElementById('modalTotalEstoque').textContent = 'Total Estoque: ' + fmtNum(totalEstoque);
-        
-    }).catch(function(erro) {
-        modalBody.innerHTML = '<div style="padding:20px;color:red;">Erro ao carregar similares: ' + erro + '</div>';
-    });
-}
-
-function fecharModal() {
-    document.getElementById('modalSimilares').classList.remove('show');
-}
-
-function fecharModalFora(event) {
-    if (event.target.id === 'modalSimilares') {
-        fecharModal();
-    }
-}
-
-// Fechar modal com ESC
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' || e.keyCode === 27) {
-        fecharModal();
-    }
+btn.addEventListener('click', async () => {
+  const text = cmdEl.innerText.trim();
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = '✓ Copiado';
+    btn.classList.add('ok');
+    setTimeout(() => {
+      btn.textContent = 'Copiar comando';
+      btn.classList.remove('ok');
+    }, 2400);
+  } catch (e) {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    btn.textContent = '✓ Copiado';
+    btn.classList.add('ok');
+    setTimeout(() => {
+      btn.textContent = 'Copiar comando';
+      btn.classList.remove('ok');
+    }, 2400);
+  }
 });
 
-// ==================== FUNÇÕES AUXILIARES ====================
+// Copy full PowerShell script
+const btnFull = document.getElementById('btn-copy-full');
+const psEl = document.getElementById('ps-script');
+const sizeEl = document.getElementById('script-size');
 
-function escapeHtml(text) {
-    if (!text) return '';
-    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+// Atualiza tamanho do script ao carregar
+const psContent = psEl.textContent.trim();
+const lines = psContent.split('\n').length;
+const kb = (psContent.length / 1024).toFixed(1);
+sizeEl.textContent = `Clean-ClaudeVault.ps1 · v5.0 MVP · ${lines} linhas · ${kb} KB`;
+
+btnFull.addEventListener('click', async () => {
+  const text = psContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    btnFull.innerHTML = '✓ Copiado · cole no Notepad e salve como .ps1 <span class="arrow">↓</span>';
+    setTimeout(() => {
+      btnFull.innerHTML = 'Copiar PowerShell completo <span class="arrow">↓</span>';
+    }, 3000);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    btnFull.innerHTML = '✓ Copiado · cole no Notepad e salve como .ps1 <span class="arrow">↓</span>';
+    setTimeout(() => {
+      btnFull.innerHTML = 'Copiar PowerShell completo <span class="arrow">↓</span>';
+    }, 3000);
+  }
+});
+
+
+// Service Worker registration (PWA install)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.warn('SW failed:', err));
+  });
 }
 
-function getBadgeABC(v) { if (!v) return '-'; return '<span class="badge badge-' + v.toLowerCase() + '">' + v + '</span>'; }
-function getBadgeDecisao(v) { if (!v) return '-'; var c = v === 'PEDIR' ? 'pedir' : v === 'ANALISAR' ? 'analisar' : 'nao'; return '<span class="badge badge-' + c + '">' + (v === 'NAO PEDIR' ? 'NÃO' : v) + '</span>'; }
-function getBadgeUrgencia(v) { if (!v || v === 'NULO') return '-'; return '<span class="badge badge-' + v.toLowerCase() + '">' + v + '</span>'; }
-function fmtNum(v) { return v == null ? '0' : Math.round(Number(v)).toLocaleString('pt-BR'); }
-function formatarData(v) { if (!v) return ''; return new Date(v).toLocaleDateString('pt-BR'); }
-
-function ordenar(col) {
-    if (colunaOrdenada === col) { ordemAsc = !ordemAsc; } else { colunaOrdenada = col; ordemAsc = true; }
-    dadosFiltrados.sort(function(a, b) {
-        var va = a[col], vb = b[col];
-        if (va == null) va = ''; if (vb == null) vb = '';
-        var r = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'pt-BR');
-        return ordemAsc ? r : -r;
-    });
-    var ths = document.querySelectorAll('th');
-    for (var i = 0; i < ths.length; i++) { ths[i].classList.remove('sorted-asc', 'sorted-desc'); var ic = ths[i].querySelector('.sort-icon'); if (ic) ic.textContent = ''; }
-    var th = document.querySelector('th[data-col="' + col + '"]');
-    if (th) { th.classList.add(ordemAsc ? 'sorted-asc' : 'sorted-desc'); th.querySelector('.sort-icon').textContent = ordemAsc ? '▲' : '▼'; }
-    renderizarTabela();
-}
-
-function aplicarFiltros() {
-    var dec = document.getElementById('filtroDecisao').value;
-    var abc = document.getElementById('filtroABC').value;
-    var urg = document.getElementById('filtroUrgencia').value;
-    var bus = document.getElementById('filtroBusca').value.toUpperCase();
-    dadosFiltrados = [];
-    for (var i = 0; i < dadosOriginais.length; i++) {
-        var r = dadosOriginais[i];
-        if (dec && r.DECISAO !== dec) continue;
-        if (abc && r.ORG_ABC !== abc) continue;
-        if (urg && r.URGENCIA !== urg) continue;
-        if (bus && ((r.CODPROD || '') + ' ' + (r.REFFORN || '') + ' ' + (r.DESCRPROD || '') + ' ' + (r.MARCA || '')).toUpperCase().indexOf(bus) === -1) continue;
-        dadosFiltrados.push(r);
-    }
-    renderizarTabela();
-    atualizarContadores();
-}
-
-function limparFiltros() {
-    document.getElementById('filtroDecisao').value = '';
-    document.getElementById('filtroABC').value = '';
-    document.getElementById('filtroUrgencia').value = '';
-    document.getElementById('filtroBusca').value = '';
-    dadosFiltrados = dadosOriginais.slice();
-    renderizarTabela();
-    atualizarContadores();
-}
-
-function atualizarContadores() {
-    document.getElementById('totalRegistros').textContent = dadosOriginais.length.toLocaleString('pt-BR') + ' registros';
-    document.getElementById('totalFiltrados').textContent = dadosFiltrados.length !== dadosOriginais.length ? 'Exibindo: ' + dadosFiltrados.length.toLocaleString('pt-BR') : '';
-}
-
-document.getElementById('filtroBusca').onkeypress = function(e) { if (e.keyCode === 13) aplicarFiltros(); };
-carregarDados();
+// Detect PWA install prompt and offer install hint
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Marker for future install button
+  console.log('PWA install available');
+});
 </script>
+
 </body>
 </html>
