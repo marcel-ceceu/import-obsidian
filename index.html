@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sugestão de Compra</title>
+    <script src="https://cdn.jsdelivr.net/gh/wansleynery/SankhyaJX@main/jx.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; font-size: 11px; background: #f5f5f5; }
+        
+        .header { background: #2563eb; color: #fff; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 14px; font-weight: bold; }
+        .header-info { font-size: 10px; opacity: 0.8; }
+        
+        .filtros { background: #fff; padding: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #ddd; }
+        .filtros label { font-weight: bold; color: #333; }
+        .filtros select, .filtros input { padding: 5px 8px; border: 1px solid #ccc; font-size: 11px; border-radius: 3px; }
+        .filtros input[type="text"] { width: 180px; }
+        .btn { border: none; padding: 6px 12px; cursor: pointer; border-radius: 3px; font-size: 11px; }
+        .btn-primary { background: #2563eb; color: #fff; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-secondary { background: #6b7280; color: #fff; }
+        
+        .table-container { background: #fff; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { background: #333; color: #fff; padding: 8px 4px; text-align: center; font-size: 10px; cursor: pointer; user-select: none; white-space: nowrap; }
+        th:hover { background: #444; }
+        th .sort-icon { margin-left: 3px; font-size: 8px; }
+        th.sorted-asc, th.sorted-desc { background: #1d4ed8; }
+        td { border: 1px solid #e0e0e0; padding: 5px 4px; text-align: center; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        tr:hover { background: #e8f4ff; }
+        .col-desc { text-align: left !important; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .col-num { text-align: right !important; padding-right: 8px !important; }
+        
+        .badge { padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold; display: inline-block; }
+        .badge-pedir { background: #dcfce7; color: #166534; }
+        .badge-analisar { background: #fef9c3; color: #854d0e; }
+        .badge-nao { background: #f3f4f6; color: #6b7280; }
+        .badge-alta { background: #fee2e2; color: #dc2626; }
+        .badge-normal { background: #e0e7ff; color: #4338ca; }
+        .badge-a { background: #dbeafe; color: #1d4ed8; font-weight: bold; }
+        .badge-b { background: #e0e7ff; color: #4338ca; }
+        .badge-c { background: #f3f4f6; color: #6b7280; }
+        
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .loading-spinner { border: 3px solid #f3f3f3; border-top: 3px solid #2563eb; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .footer { background: #fff; padding: 10px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; }
+        .footer-info { color: #666; font-size: 10px; }
+        .sugestao-valor { font-weight: bold; color: #2563eb; }
+        
+        /* Emoji clicável */
+        .btn-similar { cursor: pointer; font-size: 14px; margin-left: 4px; transition: transform 0.2s; }
+        .btn-similar:hover { transform: scale(1.3); }
+        
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: #fff; border-radius: 8px; width: 90%; max-width: 800px; max-height: 80vh; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .modal-header { background: #2563eb; color: #fff; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { font-size: 14px; font-weight: bold; }
+        .modal-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; }
+        .modal-close:hover { opacity: 0.8; }
+        .modal-body { padding: 15px; overflow-y: auto; max-height: calc(80vh - 100px); }
+        .modal-info { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 4px; padding: 10px; margin-bottom: 15px; font-size: 11px; }
+        .modal-info strong { color: #0369a1; }
+        .modal-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .modal-table th { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 8px 6px; text-align: left; font-weight: bold; }
+        .modal-table td { border: 1px solid #e2e8f0; padding: 6px; }
+        .modal-table tr:hover { background: #f8fafc; }
+        .modal-table .col-num { text-align: right; }
+        .modal-footer { background: #f8fafc; padding: 10px 15px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+        .modal-total { font-weight: bold; color: #2563eb; }
+        
+        .loading-modal { text-align: center; padding: 30px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📦 SUGESTÃO DE COMPRA</h1>
+    <span class="header-info" id="dtRef"></span>
+</div>
+
+<div class="filtros">
+    <label>Decisão:</label>
+    <select id="filtroDecisao">
+        <option value="">Todos</option>
+        <option value="PEDIR">PEDIR</option>
+        <option value="ANALISAR">ANALISAR</option>
+        <option value="NAO PEDIR">NÃO PEDIR</option>
+    </select>
+    
+    <label>ABC:</label>
+    <select id="filtroABC">
+        <option value="">Todos</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+    </select>
+    
+    <label>Urgência:</label>
+    <select id="filtroUrgencia">
+        <option value="">Todos</option>
+        <option value="ALTA">ALTA</option>
+        <option value="NORMAL">NORMAL</option>
+    </select>
+    
+    <label>Buscar:</label>
+    <input type="text" id="filtroBusca" placeholder="Código, ref ou descrição...">
+    
+    <button class="btn btn-primary" onclick="aplicarFiltros()">Filtrar</button>
+    <button class="btn btn-secondary" onclick="limparFiltros()">Limpar</button>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th data-col="CODPROD" onclick="ordenar('CODPROD')">CÓD <span class="sort-icon"></span></th>
+                <th data-col="REFFORN" onclick="ordenar('REFFORN')">REF <span class="sort-icon"></span></th>
+                <th data-col="DESCRPROD" onclick="ordenar('DESCRPROD')">DESCRIÇÃO <span class="sort-icon"></span></th>
+                <th data-col="MARCA" onclick="ordenar('MARCA')">MARCA <span class="sort-icon"></span></th>
+                <th data-col="ORG_ABC" onclick="ordenar('ORG_ABC')">ABC <span class="sort-icon"></span></th>
+                <th data-col="ORG_ETQAT" onclick="ordenar('ORG_ETQAT')">ETQ <span class="sort-icon"></span></th>
+                <th data-col="SIM_ETQAT" onclick="ordenar('SIM_ETQAT')">SIM <span class="sort-icon"></span></th>
+                <th data-col="ORG_ETQMIN" onclick="ordenar('ORG_ETQMIN')">MÍN <span class="sort-icon"></span></th>
+                <th data-col="SUGESTAO" onclick="ordenar('SUGESTAO')">SUG <span class="sort-icon"></span></th>
+                <th data-col="DECISAO" onclick="ordenar('DECISAO')">DECISÃO <span class="sort-icon"></span></th>
+                <th data-col="URGENCIA" onclick="ordenar('URGENCIA')">URG <span class="sort-icon"></span></th>
+            </tr>
+        </thead>
+        <tbody id="tbody">
+            <tr><td colspan="11" class="loading"><div class="loading-spinner"></div>Carregando...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="footer">
+    <span class="footer-info" id="totalRegistros">0 registros</span>
+    <span class="footer-info" id="totalFiltrados"></span>
+</div>
+
+<!-- Modal de Similares -->
+<div class="modal-overlay" id="modalSimilares" onclick="fecharModalFora(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h2>🔍 Produtos Similares</h2>
+            <button class="modal-close" onclick="fecharModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <div class="loading-modal">
+                <div class="loading-spinner"></div>
+                Carregando similares...
+            </div>
+        </div>
+        <div class="modal-footer" id="modalFooter">
+            <span id="modalQtdSimilares"></span>
+            <span class="modal-total" id="modalTotalEstoque"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+var VSS = null;
+var dadosOriginais = [];
+var dadosFiltrados = [];
+var colunaOrdenada = 'RANKI';
+var ordemAsc = true;
+
+function carregarDados() {
+    var sql = "WITH CTE_BASE AS ( " +
+        "SELECT ITE.CODPROD, PRO.REFFORN, PRO.CODIGO, PRO.MARCA, PRO.QTDAGRUPAMENTOMTZ, PRO.DESCRPROD, PRO.COMPLDESC, PRO.CODGRUPOPROD, PRO.DESCRGRUPOPROD, PRO.AD_COTADMF, PRO.AD_CATCOMPRA, PRO.AD_STATUSREP, " +
+        "NVL(ABC.RANKING_QTDPED, 0) AS RANKI, NVL(ABC.QTDPEDVENLIQ_12M, 0) AS ORG_PED12M, ABC.ABC_PED AS ORG_ABC, " +
+        "NVL(MED.ITEVENLIQ_12M, 0) AS ORG_ITE12M, NVL(MED.MEDMES, 0) AS ORG_MEDMES, NVL(MED.ETQMIN, 0) AS ORG_ETQMIN, NVL(MED.ETQMED, 0) AS ORG_ETQMED, NVL(MED.ETQMAX, 0) AS ORG_ETQMAX, " +
+        "NVL(EST.ESTOQUE, 0) AS ORG_ETQAT, " +
+        "NVL(MEDSIM.SIM_PEDLIQ, 0) AS SIM_PED12M, NVL(MEDSIM.SIM_MEDMES, 0) AS SIM_MEDMES, NVL(MEDSIM.SIM_ETQMIN, 0) AS SIM_ETQMIN, NVL(MEDSIM.SIM_ETQMED, 0) AS SIM_ETQMED, NVL(MEDSIM.SIM_ETQMAX, 0) AS SIM_ETQMAX, " +
+        "NVL(ESTSIM.SUM_ESTOQUE, 0) AS SIM_ETQAT, NVL(ESTSIM.QTD_MARCAEST, 0) AS SIM_MARCAETQ " +
+        "FROM AE1_2509_ITEMOVENTINICIAL ITE " +
+        "INNER JOIN AE0_2508_PRODUTOCOMPLETO PRO ON PRO.CODPROD = ITE.CODPROD " +
+        "LEFT JOIN AE1_2509_ITEABC ABC ON ABC.CODPROD = ITE.CODPROD " +
+        "LEFT JOIN AE1_2509_MEDMES MED ON MED.CODPROD = ITE.CODPROD " +
+        "LEFT JOIN AE1_2508_TGFEST EST ON EST.CODPROD = ITE.CODPROD " +
+        "LEFT JOIN AE1_2509_MEDMES_SIM MEDSIM ON MEDSIM.COMPLDESC = PRO.COMPLDESC " +
+        "LEFT JOIN AE1_2509_ESTSIM ESTSIM ON ESTSIM.COMPLDESC = PRO.COMPLDESC) " +
+        "SELECT SYSDATE AS DTREF, B.CODPROD, B.REFFORN, B.CODIGO, B.MARCA, B.COMPLDESC, B.DESCRPROD, B.CODGRUPOPROD, B.DESCRGRUPOPROD, B.RANKI, B.ORG_PED12M, B.ORG_ABC, B.ORG_ITE12M, B.SIM_PED12M, B.ORG_MEDMES, B.SIM_MEDMES, B.ORG_ETQAT, B.SIM_ETQAT, B.SIM_MARCAETQ, B.ORG_ETQMIN, B.ORG_ETQMED, B.ORG_ETQMAX, B.SIM_ETQMIN, B.SIM_ETQMED, B.SIM_ETQMAX, B.AD_COTADMF, B.AD_CATCOMPRA, B.AD_STATUSREP, " +
+        "CASE WHEN NVL(B.AD_STATUSREP, 0) = 2 OR NVL(B.AD_CATCOMPRA, 0) IN (1, 3) THEN 'INELEGIVEL' ELSE 'ELEGIVEL' END AS SELECAO, " +
+        "CASE WHEN B.ORG_ETQAT >= B.ORG_ETQMIN OR B.ORG_ABC IS NULL THEN 'NAO PEDIR' WHEN B.ORG_ETQAT < B.ORG_ETQMIN THEN CASE B.ORG_ABC WHEN 'A' THEN 'PEDIR' WHEN 'B' THEN CASE WHEN B.SIM_ETQAT < B.SIM_ETQMIN THEN 'PEDIR' ELSE 'NAO PEDIR' END WHEN 'C' THEN CASE WHEN B.SIM_ETQAT < B.SIM_ETQMIN THEN 'ANALISAR' ELSE 'NAO PEDIR' END ELSE 'ANALISAR' END ELSE 'ANALISAR' END AS DECISAO, " +
+        "CASE WHEN NVL(B.AD_STATUSREP, 0) = 2 OR NVL(B.AD_CATCOMPRA, 0) IN (1, 3) THEN 'NULO' WHEN B.ORG_ETQAT > B.ORG_ETQMIN THEN 'NULO' WHEN B.ORG_ETQAT = 0 AND B.SIM_ETQAT = 0 THEN CASE WHEN NVL(B.ORG_ABC, 'Z') IN ('A', 'B') THEN 'ALTA' ELSE 'NORMAL' END WHEN B.ORG_ETQAT < B.ORG_ETQMIN AND B.ORG_ETQAT > 0 AND B.SIM_ETQAT < B.SIM_ETQMIN AND B.SIM_ETQAT > 0 THEN CASE WHEN NVL(B.ORG_ABC, 'Z') IN ('A', 'B') THEN 'ALTA' ELSE 'NORMAL' END ELSE 'NORMAL' END AS URGENCIA, " +
+        "CASE WHEN B.ORG_ETQAT >= B.ORG_ETQMIN OR B.ORG_ABC IS NULL THEN 0 WHEN B.ORG_ABC = 'A' THEN GREATEST(CEIL(CASE WHEN B.ORG_ETQMED > 0 THEN B.ORG_ETQMED ELSE B.ORG_MEDMES * 2 END - B.ORG_ETQAT), 0) WHEN B.ORG_ABC IN ('B', 'C') THEN GREATEST(CEIL(CASE WHEN B.ORG_ETQMIN > 0 THEN B.ORG_ETQMIN ELSE B.ORG_MEDMES END - B.ORG_ETQAT), 0) ELSE 0 END AS SUGESTAO, " +
+        "B.QTDAGRUPAMENTOMTZ FROM CTE_BASE B ORDER BY NULLIF(B.RANKI, 0) NULLS LAST, B.COMPLDESC";
+
+    JX.consultar(sql).then(function(resultado) {
+        dadosOriginais = resultado || [];
+        dadosFiltrados = dadosOriginais.slice();
+        if (dadosOriginais.length > 0 && dadosOriginais[0].DTREF) {
+            document.getElementById('dtRef').textContent = 'Ref: ' + formatarData(dadosOriginais[0].DTREF);
+        }
+        renderizarTabela();
+        atualizarContadores();
+    }).catch(function(erro) {
+        document.getElementById('tbody').innerHTML = '<tr><td colspan="11" style="color:red;padding:20px;">Erro: ' + erro + '</td></tr>';
+    });
+}
+
+function renderizarTabela() {
+    var tbody = document.getElementById('tbody');
+    if (dadosFiltrados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="padding:20px;color:#666;">Nenhum registro</td></tr>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < dadosFiltrados.length; i++) {
+        var r = dadosFiltrados[i];
+        var simEtq = Number(r.SIM_ETQAT) || 0;
+        var emojiSimilar = '';
+        
+        // Emoji clicável SOMENTE se SIM_ETQAT > 0
+        if (simEtq > 0) {
+            emojiSimilar = '<span class="btn-similar" onclick="abrirModalSimilares(\'' + escapeHtml(r.COMPLDESC) + '\', ' + r.CODPROD + ')" title="Ver produtos similares">🔍</span>';
+        }
+        
+        html += '<tr>' +
+            '<td>' + (r.CODPROD || '') + '</td>' +
+            '<td>' + (r.REFFORN || '') + '</td>' +
+            '<td class="col-desc" title="' + escapeHtml(r.DESCRPROD || '') + '">' + (r.DESCRPROD || '') + '</td>' +
+            '<td>' + (r.MARCA || '') + '</td>' +
+            '<td>' + getBadgeABC(r.ORG_ABC) + '</td>' +
+            '<td class="col-num">' + fmtNum(r.ORG_ETQAT) + '</td>' +
+            '<td class="col-num">' + fmtNum(simEtq) + emojiSimilar + '</td>' +
+            '<td class="col-num">' + fmtNum(r.ORG_ETQMIN) + '</td>' +
+            '<td class="col-num">' + (r.SUGESTAO > 0 ? '<span class="sugestao-valor">' + fmtNum(r.SUGESTAO) + '</span>' : '0') + '</td>' +
+            '<td>' + getBadgeDecisao(r.DECISAO) + '</td>' +
+            '<td>' + getBadgeUrgencia(r.URGENCIA) + '</td>' +
+            '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+// ==================== MODAL DE SIMILARES ====================
+
+function abrirModalSimilares(compldesc, codprodAtual) {
+    var modal = document.getElementById('modalSimilares');
+    var modalBody = document.getElementById('modalBody');
+    
+    // Mostrar modal com loading
+    modal.classList.add('show');
+    modalBody.innerHTML = '<div class="loading-modal"><div class="loading-spinner"></div>Carregando similares...</div>';
+    document.getElementById('modalQtdSimilares').textContent = '';
+    document.getElementById('modalTotalEstoque').textContent = '';
+    
+    // Query para buscar produtos similares pelo COMPLDESC
+    var sqlSimilares = "SELECT " +
+        "PRO.CODPROD, " +
+        "PRO.CODIGO, " +
+        "PRO.REFFORN, " +
+        "PRO.MARCA, " +
+        "PRO.DESCRPROD, " +
+        "PRO.COMPLDESC, " +
+        "NVL(EST.ESTOQUE, 0) AS ESTOQUE " +
+        "FROM AE0_2508_PRODUTOCOMPLETO PRO " +
+        "LEFT JOIN AE1_2508_TGFEST EST ON EST.CODPROD = PRO.CODPROD " +
+        "WHERE PRO.COMPLDESC = '" + compldesc.replace(/'/g, "''") + "' " +
+        "ORDER BY EST.ESTOQUE DESC NULLS LAST, PRO.MARCA";
+    
+    JX.consultar(sqlSimilares).then(function(similares) {
+        if (!similares || similares.length === 0) {
+            modalBody.innerHTML = '<div style="padding:20px;text-align:center;color:#666;">Nenhum produto similar encontrado.</div>';
+            return;
+        }
+        
+        var totalEstoque = 0;
+        var html = '<div class="modal-info">' +
+            '<strong>Referência Similar:</strong> ' + escapeHtml(compldesc) + '<br>' +
+            '<strong>Produto consultado:</strong> Código ' + codprodAtual +
+            '</div>';
+        
+        html += '<table class="modal-table">' +
+            '<thead><tr>' +
+            '<th>Código</th>' +
+            '<th>Referência</th>' +
+            '<th>Descrição</th>' +
+            '<th>Marca</th>' +
+            '<th style="text-align:right;">Estoque</th>' +
+            '</tr></thead><tbody>';
+        
+        for (var i = 0; i < similares.length; i++) {
+            var s = similares[i];
+            var estoque = Number(s.ESTOQUE) || 0;
+            totalEstoque += estoque;
+            
+            // Destacar o produto atual
+            var destaque = (s.CODPROD == codprodAtual) ? ' style="background:#fef9c3;"' : '';
+            var marcador = (s.CODPROD == codprodAtual) ? ' ⭐' : '';
+            
+            html += '<tr' + destaque + '>' +
+                '<td>' + (s.CODPROD || '') + marcador + '</td>' +
+                '<td>' + (s.REFFORN || s.CODIGO || '') + '</td>' +
+                '<td>' + escapeHtml(s.DESCRPROD || '') + '</td>' +
+                '<td>' + (s.MARCA || '') + '</td>' +
+                '<td class="col-num">' + fmtNum(estoque) + '</td>' +
+                '</tr>';
+        }
+        
+        html += '</tbody></table>';
+        
+        modalBody.innerHTML = html;
+        document.getElementById('modalQtdSimilares').textContent = similares.length + ' produto(s) similar(es)';
+        document.getElementById('modalTotalEstoque').textContent = 'Total Estoque: ' + fmtNum(totalEstoque);
+        
+    }).catch(function(erro) {
+        modalBody.innerHTML = '<div style="padding:20px;color:red;">Erro ao carregar similares: ' + erro + '</div>';
+    });
+}
+
+function fecharModal() {
+    document.getElementById('modalSimilares').classList.remove('show');
+}
+
+function fecharModalFora(event) {
+    if (event.target.id === 'modalSimilares') {
+        fecharModal();
+    }
+}
+
+// Fechar modal com ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.keyCode === 27) {
+        fecharModal();
+    }
+});
+
+// ==================== FUNÇÕES AUXILIARES ====================
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function getBadgeABC(v) { if (!v) return '-'; return '<span class="badge badge-' + v.toLowerCase() + '">' + v + '</span>'; }
+function getBadgeDecisao(v) { if (!v) return '-'; var c = v === 'PEDIR' ? 'pedir' : v === 'ANALISAR' ? 'analisar' : 'nao'; return '<span class="badge badge-' + c + '">' + (v === 'NAO PEDIR' ? 'NÃO' : v) + '</span>'; }
+function getBadgeUrgencia(v) { if (!v || v === 'NULO') return '-'; return '<span class="badge badge-' + v.toLowerCase() + '">' + v + '</span>'; }
+function fmtNum(v) { return v == null ? '0' : Math.round(Number(v)).toLocaleString('pt-BR'); }
+function formatarData(v) { if (!v) return ''; return new Date(v).toLocaleDateString('pt-BR'); }
+
+function ordenar(col) {
+    if (colunaOrdenada === col) { ordemAsc = !ordemAsc; } else { colunaOrdenada = col; ordemAsc = true; }
+    dadosFiltrados.sort(function(a, b) {
+        var va = a[col], vb = b[col];
+        if (va == null) va = ''; if (vb == null) vb = '';
+        var r = (typeof va === 'number' && typeof vb === 'number') ? va - vb : String(va).localeCompare(String(vb), 'pt-BR');
+        return ordemAsc ? r : -r;
+    });
+    var ths = document.querySelectorAll('th');
+    for (var i = 0; i < ths.length; i++) { ths[i].classList.remove('sorted-asc', 'sorted-desc'); var ic = ths[i].querySelector('.sort-icon'); if (ic) ic.textContent = ''; }
+    var th = document.querySelector('th[data-col="' + col + '"]');
+    if (th) { th.classList.add(ordemAsc ? 'sorted-asc' : 'sorted-desc'); th.querySelector('.sort-icon').textContent = ordemAsc ? '▲' : '▼'; }
+    renderizarTabela();
+}
+
+function aplicarFiltros() {
+    var dec = document.getElementById('filtroDecisao').value;
+    var abc = document.getElementById('filtroABC').value;
+    var urg = document.getElementById('filtroUrgencia').value;
+    var bus = document.getElementById('filtroBusca').value.toUpperCase();
+    dadosFiltrados = [];
+    for (var i = 0; i < dadosOriginais.length; i++) {
+        var r = dadosOriginais[i];
+        if (dec && r.DECISAO !== dec) continue;
+        if (abc && r.ORG_ABC !== abc) continue;
+        if (urg && r.URGENCIA !== urg) continue;
+        if (bus && ((r.CODPROD || '') + ' ' + (r.REFFORN || '') + ' ' + (r.DESCRPROD || '') + ' ' + (r.MARCA || '')).toUpperCase().indexOf(bus) === -1) continue;
+        dadosFiltrados.push(r);
+    }
+    renderizarTabela();
+    atualizarContadores();
+}
+
+function limparFiltros() {
+    document.getElementById('filtroDecisao').value = '';
+    document.getElementById('filtroABC').value = '';
+    document.getElementById('filtroUrgencia').value = '';
+    document.getElementById('filtroBusca').value = '';
+    dadosFiltrados = dadosOriginais.slice();
+    renderizarTabela();
+    atualizarContadores();
+}
+
+function atualizarContadores() {
+    document.getElementById('totalRegistros').textContent = dadosOriginais.length.toLocaleString('pt-BR') + ' registros';
+    document.getElementById('totalFiltrados').textContent = dadosFiltrados.length !== dadosOriginais.length ? 'Exibindo: ' + dadosFiltrados.length.toLocaleString('pt-BR') : '';
+}
+
+document.getElementById('filtroBusca').onkeypress = function(e) { if (e.keyCode === 13) aplicarFiltros(); };
+carregarDados();
+</script>
+</body>
+</html>
