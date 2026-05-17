@@ -27,6 +27,28 @@ Existia antes como ~10 horas de trabalho manual fazendo CLI no terminal. Agora: 
 - **Não** sincroniza em tempo real (sync é manual, on-demand)
 - **Não** suporta multi-usuário ou multi-PC (caminhos hardcoded pro PC casa do Marcel)
 
+### Aba 2 · Vault Copy (ferramenta de extração pós-busca)
+
+A partir da v1.1, o `index.html` tem 2 abas. A aba **Import Pipeline** (original) cuida do fluxo Claude.ai → Obsidian. A aba **Vault Copy** resolve o problema oposto: depois que você usou `Ctrl+Shift+F` ou Omnisearch no Obsidian e achou N conversas relevantes, ela copia esses arquivos em massa pra outra pasta (Desktop, projeto externo, anexo de email, etc.).
+
+**Fluxo da aba Vault Copy:**
+1. Selecionar pasta do vault (`ClaudeMsgm`) — autoriza leitura
+2. Colar os resultados do "Copy search results" do Obsidian no textarea (cada linha vira um path relativo)
+3. Selecionar pasta destino (pai) + opcionalmente nomear a subpasta — autoriza escrita
+4. Clicar "Copiar arquivos" → cria `resultados-{nome ou timestamp}/` no destino com todos os `.md`
+
+**Decisões técnicas:**
+- Usa **File System Access API** (Chrome/Edge somente — Firefox/Safari mostram aviso e a aba 1 continua funcionando)
+- Handles do vault e destino persistem em **IndexedDB** entre sessões (autorização renovada com 1 clique após reabrir o browser)
+- Re-skinada pro tema papel/carmesim do PWA (classes prefixadas `.vc-*` pra zero colisão com `.phase`/`.step` da aba 1)
+- Lógica está embutida no mesmo `index.html` — sem build, sem arquivo extra
+- Service Worker bumpado pra `cv-sync-v1.1.0` neste release pra invalidar cache do cliente
+
+**O que NÃO faz:**
+- Não abre o Explorer do Windows (limitação da FSA — alerta o usuário com o nome da subpasta criada)
+- Não suporta operações em mais de uma pasta destino simultâneamente
+- Não filtra conteúdo dos `.md` (copia byte-a-byte)
+
 ### Decisões arquiteturais que o Cursor NÃO deve reverter
 
 #### 1. HTML/CSS/JS puro, sem React/Vite/build
@@ -83,7 +105,7 @@ Resolve `UnicodeEncodeError: 'charmap' codec` quando o `rich` (lib Python usada 
 
 | Arquivo | Função |
 |---|---|
-| `index.html` | PWA single-file: tutorial visual + 2 botões copy (one-liner e PS completo embutido) |
+| `index.html` | PWA single-file: 2 abas — **Import Pipeline** (tutorial visual + 2 botões copy) e **Vault Copy** (ferramenta de extração pós-busca) |
 | `Clean-ClaudeVault.ps1` | Pipeline: detecta ZIP, extrai, patch tagging.py, sync, limpa `.md`, log |
 | `manifest.json` | PWA manifest (instalável na desktop) |
 | `service-worker.js` | Cache offline (estratégia cache-first) |
