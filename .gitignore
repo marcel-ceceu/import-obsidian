@@ -1,0 +1,35 @@
+# Dependências (caso evolua pra build)
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs (caso evolua)
+dist/
+build/
+.next/
+.vercel/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+
+# Logs locais (do PowerShell rodando no Marcel)
+LOG-SYNC*.txt
+LOG-DEPS*.txt
+LOG-INSTALL*.txt
+
+# Backups locais do tagging.py (não precisa versionar)
+tagging.py.bak
+
+# Env files (sem secrets agora, mas precaução)
+.env
+.env.local
+.env.production.local
