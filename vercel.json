@@ -1,4 +1,4 @@
-{
+﻿{
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "trailingSlash": false,
@@ -15,12 +15,6 @@
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=3600" },
         { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }
-      ]
-    },
-    {
-      "source": "/(.*\\.(png|svg|jpg|jpeg|webp|ico))",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=2592000, immutable" }
       ]
     }
   ]
