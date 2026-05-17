@@ -622,6 +622,334 @@ footer {
   .brand-row { flex-direction: column; }
   .brand-meta { text-align: left; }
 }
+
+/* ============ TABS NAV ============ */
+.tabs-nav {
+  display: flex;
+  gap: 0;
+  margin: 0 0 36px;
+  border-bottom: 1px solid var(--line);
+  opacity: 0;
+  animation: fadeUp .8s ease forwards;
+  animation-delay: .08s;
+}
+.tab-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 14px 0 14px 0;
+  margin-right: 32px;
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--mute);
+  cursor: pointer;
+  transition: color .2s ease, border-color .2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.tab-btn .tab-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--mute);
+}
+.tab-btn:hover { color: var(--ink-2); }
+.tab-btn.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tab-btn.active .tab-num { color: var(--accent); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ============ VAULT COPY (tab 2) ============ */
+.vc-intro {
+  margin: 0 0 32px;
+  max-width: 640px;
+  opacity: 0;
+  animation: fadeUp .8s ease forwards;
+  animation-delay: .1s;
+}
+.vc-intro h2 {
+  font-family: 'Instrument Serif', serif;
+  font-size: 44px;
+  font-weight: 400;
+  margin: 0 0 10px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.vc-intro h2 em { font-style: italic; color: var(--accent); }
+.vc-intro p {
+  color: var(--ink-2);
+  margin: 0;
+  font-size: 16px;
+  max-width: 560px;
+}
+
+.vc-step {
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  padding: 28px 32px;
+  margin-bottom: 20px;
+  position: relative;
+  opacity: 0;
+  animation: fadeUp .8s ease forwards;
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+.vc-step:nth-of-type(1) { animation-delay: .18s; }
+.vc-step:nth-of-type(2) { animation-delay: .25s; }
+.vc-step:nth-of-type(3) { animation-delay: .32s; }
+.vc-step:hover { box-shadow: var(--shadow-3); }
+.vc-step.ready { border-color: var(--ok); }
+
+.vc-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  margin-bottom: 16px;
+}
+.vc-step-num {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 56px;
+  line-height: 0.85;
+  color: var(--accent);
+  flex-shrink: 0;
+  letter-spacing: -0.04em;
+}
+.vc-step h3 {
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  flex: 1;
+  margin: 0;
+  padding-top: 14px;
+}
+.vc-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.vc-status.ok { color: var(--ok); border-color: var(--ok); }
+.vc-status.warn { color: var(--warn); border-color: var(--warn); }
+
+.vc-path {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px dashed var(--line-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-2);
+  word-break: break-all;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+}
+.vc-path.empty { color: var(--mute); font-style: italic; }
+.vc-pill {
+  display: inline-block;
+  background: var(--paper-2);
+  color: var(--mute);
+  padding: 1px 8px;
+  border-radius: 100px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-left: 8px;
+  border: 1px solid var(--line);
+}
+
+.vc-textarea {
+  width: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-2);
+  padding: 14px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  resize: vertical;
+  min-height: 160px;
+  transition: border-color .2s;
+}
+.vc-textarea:focus { outline: none; border-color: var(--accent); }
+.vc-textarea::placeholder { color: var(--mute); font-style: italic; }
+
+.vc-label {
+  display: block;
+  margin-top: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.vc-input {
+  width: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line-2);
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  margin-top: 6px;
+  transition: border-color .2s;
+}
+.vc-input:focus { outline: none; border-color: var(--accent); }
+
+.vc-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.vc-link-btn {
+  background: none;
+  border: 0;
+  color: var(--mute);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 4px 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  text-decoration-color: var(--line);
+}
+.vc-link-btn:hover { color: var(--accent); text-decoration-color: var(--accent); }
+
+.vc-execute-wrap { margin-top: 8px; opacity: 0; animation: fadeUp .8s ease forwards; animation-delay: .4s; }
+
+.vc-execute {
+  width: 100%;
+  padding: 18px;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.vc-execute:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.vc-execute:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: var(--paper-2);
+  color: var(--mute);
+  border-color: var(--line-2);
+}
+.vc-execute.processing { opacity: 0.75; }
+
+.vc-results {
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  padding: 28px 32px;
+  margin-top: 24px;
+  animation: fadeUp .4s ease;
+}
+.vc-results h3 {
+  font-family: 'Instrument Serif', serif;
+  font-size: 28px;
+  font-weight: 400;
+  margin: 0 0 16px;
+  line-height: 1.1;
+}
+.vc-summary {
+  background: var(--paper);
+  padding: 14px 18px;
+  border-left: 2px solid var(--accent);
+  margin-bottom: 18px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.vc-summary code {
+  background: var(--paper-2);
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: var(--accent-2);
+}
+.vc-summary strong { color: var(--accent); font-weight: 700; }
+
+.vc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+}
+.vc-list li {
+  padding: 8px 14px;
+  border-bottom: 1px dotted var(--line);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  word-break: break-all;
+}
+.vc-list li:last-child { border-bottom: 0; }
+.vc-list .vc-tag {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 2px 6px;
+}
+.vc-list li.ok { color: var(--ink-2); }
+.vc-list li.ok .vc-tag { color: var(--ok); border: 1px solid var(--ok); }
+.vc-list li.fail { color: var(--accent-2); }
+.vc-list li.fail .vc-tag { color: var(--accent); border: 1px solid var(--accent); }
+
+.vc-no-support {
+  padding: 32px;
+  border: 1px solid var(--accent);
+  background: var(--paper-2);
+  margin-top: 24px;
+}
+.vc-no-support h3 {
+  font-family: 'Instrument Serif', serif;
+  color: var(--accent);
+  font-size: 28px;
+  margin: 0 0 10px;
+  font-style: italic;
+}
+.vc-no-support p { color: var(--ink-2); margin: 0; font-size: 14.5px; line-height: 1.6; }
+
+@media (max-width: 640px) {
+  .vc-step { padding: 22px; }
+  .vc-step-num { font-size: 40px; }
+  .vc-step h3 { padding-top: 0; }
+  .vc-intro h2 { font-size: 32px; }
+  .vc-step-head { gap: 14px; flex-wrap: wrap; }
+}
 </style>
 </head>
 
@@ -641,6 +969,19 @@ footer {
     <h1 class="title">Claude Vault<br><em>Sync</em></h1>
     <p class="subtitle">Manual operacional para importar suas conversas do Claude.ai no Obsidian em segundos, sem duplicatas, com limpeza automática dos blocos quebrados.</p>
   </header>
+
+  <!-- ============ TABS NAV ============ -->
+  <nav class="tabs-nav" role="tablist">
+    <button class="tab-btn active" data-tab="import" role="tab" aria-selected="true">
+      <span class="tab-num">01</span>Import Pipeline
+    </button>
+    <button class="tab-btn" data-tab="copy" role="tab" aria-selected="false">
+      <span class="tab-num">02</span>Vault Copy
+    </button>
+  </nav>
+
+  <!-- ============ TAB: IMPORT PIPELINE ============ -->
+  <div id="tab-import" class="tab-panel active" role="tabpanel">
 
   <!-- ============ STATUS STRIP ============ -->
   <div class="status-strip">
@@ -803,6 +1144,81 @@ footer {
       &mdash; Fase 1 do projeto Claude Vault PWA &mdash;
     </div>
   </footer>
+
+  </div><!-- /#tab-import -->
+
+  <!-- ============ TAB: VAULT COPY ============ -->
+  <div id="tab-copy" class="tab-panel" role="tabpanel">
+
+    <div class="vc-intro">
+      <h2>Vault <em>Copy</em></h2>
+      <p>Pesquise no Obsidian, cole os resultados aqui, copie em massa pra outra pasta. Útil quando você quer extrair um lote de conversas pós-busca pra análise externa.</p>
+    </div>
+
+    <!-- Browser support warning (preenchido via JS se faltar suporte) -->
+    <div id="vc-no-support" class="vc-no-support" hidden>
+      <h3>Browser sem suporte</h3>
+      <p>Esta aba usa a <strong>File System Access API</strong>, disponível apenas no <strong>Chrome</strong> ou <strong>Microsoft Edge</strong>. Abra esta página em um deles. A aba <em>Import Pipeline</em> continua funcionando normalmente.</p>
+    </div>
+
+    <div id="vc-app">
+
+    <!-- Step 1: Vault -->
+    <section class="vc-step" id="vc-step-1">
+      <div class="vc-step-head">
+        <span class="vc-step-num">01</span>
+        <h3>Pasta do Vault</h3>
+        <span class="vc-status" id="vc-status-vault">pendente</span>
+      </div>
+      <button class="btn btn-ghost" id="vc-btn-vault" type="button">Selecionar pasta do vault</button>
+      <div class="vc-path empty" id="vc-path-vault">nenhuma pasta selecionada</div>
+    </section>
+
+    <!-- Step 2: Paste -->
+    <section class="vc-step" id="vc-step-2">
+      <div class="vc-step-head">
+        <span class="vc-step-num">02</span>
+        <h3>Resultados do Obsidian</h3>
+        <span class="vc-status" id="vc-status-paste">0 caminhos</span>
+      </div>
+      <textarea class="vc-textarea" id="vc-paste" placeholder="Cole aqui (Ctrl+V) o output do 'Copy search results' do Obsidian.&#10;&#10;Exemplo:&#10;1. conversations/2026-04-21-Funcionamento.md&#10;2. conversations/2026-04-22-Consulta.md"></textarea>
+      <div class="vc-row">
+        <button class="vc-link-btn" id="vc-btn-clear" type="button">limpar área de cola</button>
+      </div>
+    </section>
+
+    <!-- Step 3: Destination -->
+    <section class="vc-step" id="vc-step-3">
+      <div class="vc-step-head">
+        <span class="vc-step-num">03</span>
+        <h3>Pasta destino</h3>
+        <span class="vc-status" id="vc-status-dest">pendente</span>
+      </div>
+      <button class="btn btn-ghost" id="vc-btn-dest" type="button">Selecionar pasta pai (ex: Desktop)</button>
+      <div class="vc-path empty" id="vc-path-dest">nenhuma pasta selecionada</div>
+      <label class="vc-label" for="vc-folder-name">Nome da subpasta (vazio = timestamp automático)</label>
+      <input type="text" class="vc-input" id="vc-folder-name" placeholder="ex: scorepositivo">
+    </section>
+
+    <!-- Execute -->
+    <div class="vc-execute-wrap">
+      <button class="vc-execute" id="vc-btn-execute" type="button" disabled>Copiar arquivos</button>
+    </div>
+
+    <!-- Results -->
+    <section class="vc-results" id="vc-results" hidden>
+      <h3>Resultado</h3>
+      <div class="vc-summary" id="vc-summary"></div>
+      <ul class="vc-list" id="vc-list"></ul>
+      <div class="vc-row" style="margin-top: 18px;">
+        <button class="btn btn-ghost" id="vc-btn-open" type="button">Abrir pasta destino no Explorer</button>
+        <button class="vc-link-btn" id="vc-btn-reset" type="button">resetar pastas salvas</button>
+      </div>
+    </section>
+
+    </div><!-- /#vc-app -->
+
+  </div><!-- /#tab-copy -->
 
 </div>
 
@@ -1219,6 +1635,317 @@ window.addEventListener('beforeinstallprompt', (e) => {
   // Marker for future install button
   console.log('PWA install available');
 });
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      const active = b.dataset.tab === target;
+      b.classList.toggle('active', active);
+      b.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'tab-' + target);
+    });
+    // Smooth scroll to top of tab
+    window.scrollTo({ top: document.querySelector('.tabs-nav').offsetTop - 20, behavior: 'smooth' });
+  });
+});
+
+// ============================================================
+// VAULT COPY — File System Access API + IndexedDB
+// ============================================================
+(function initVaultCopy() {
+  // ---- Browser support check
+  if (!window.showDirectoryPicker) {
+    document.getElementById('vc-no-support').hidden = false;
+    document.getElementById('vc-app').style.display = 'none';
+    return;
+  }
+
+  // ---- IndexedDB para persistir handles entre sessões
+  const DB_NAME = 'vault-copy-tool';
+  const STORE = 'handles';
+
+  function openDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      };
+      req.onsuccess = e => resolve(e.target.result);
+      req.onerror = e => reject(e.target.error);
+    });
+  }
+  async function idbSet(key, value) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(value, key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbGet(key) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbClear() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // ---- Permissão
+  async function ensurePermission(handle, mode) {
+    const opts = { mode };
+    if ((await handle.queryPermission(opts)) === 'granted') return true;
+    return (await handle.requestPermission(opts)) === 'granted';
+  }
+
+  // ---- State
+  let vaultHandle = null;
+  let destHandle = null;
+  let lastDestSubfolder = null;
+
+  // ---- Elements
+  const $ = id => document.getElementById(id);
+  const pasteArea = $('vc-paste');
+  const btnExecute = $('vc-btn-execute');
+
+  // ---- Parse de paths
+  function parsePaths(text) {
+    return text.split(/\r?\n/)
+      .map(line => {
+        let p = line.replace(/^\s*\d+\.\s+/, '').trim();
+        p = p.replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1');
+        return p;
+      })
+      .filter(p => p.length > 0 && !p.startsWith('//'));
+  }
+
+  // ---- Navega no vault até o arquivo
+  async function getFileFromPath(rootHandle, relPath) {
+    const normalized = relPath.replace(/\\/g, '/').replace(/^\/+/, '');
+    const parts = normalized.split('/').filter(p => p.length > 0);
+    if (parts.length === 0) throw new Error('caminho vazio');
+    const fileName = parts.pop();
+    let dir = rootHandle;
+    for (const part of parts) {
+      dir = await dir.getDirectoryHandle(part);
+    }
+    return { fileHandle: await dir.getFileHandle(fileName), fileName };
+  }
+
+  // ---- UI: status
+  function setStatus(elId, text, kind) {
+    const el = $(elId);
+    el.textContent = text;
+    el.className = 'vc-status' + (kind ? ' ' + kind : '');
+    const stepMap = { 'vc-status-vault': 'vc-step-1', 'vc-status-paste': 'vc-step-2', 'vc-status-dest': 'vc-step-3' };
+    const step = $(stepMap[elId]);
+    if (step) step.classList.toggle('ready', kind === 'ok');
+  }
+
+  function updateExecuteButton() {
+    const paths = parsePaths(pasteArea.value);
+    btnExecute.disabled = !(vaultHandle && destHandle && paths.length > 0);
+  }
+
+  // ---- Vault selection
+  $('vc-btn-vault').addEventListener('click', async () => {
+    try {
+      vaultHandle = await window.showDirectoryPicker({ id: 'vault-picker', mode: 'read' });
+      await idbSet('vault', vaultHandle);
+      $('vc-path-vault').textContent = vaultHandle.name;
+      $('vc-path-vault').classList.remove('empty');
+      setStatus('vc-status-vault', '✓ ok', 'ok');
+      updateExecuteButton();
+    } catch (e) {
+      if (e.name !== 'AbortError') alert('Erro ao selecionar vault: ' + e.message);
+    }
+  });
+
+  // ---- Dest selection
+  $('vc-btn-dest').addEventListener('click', async () => {
+    try {
+      destHandle = await window.showDirectoryPicker({ id: 'dest-picker', mode: 'readwrite' });
+      await idbSet('dest', destHandle);
+      $('vc-path-dest').textContent = destHandle.name;
+      $('vc-path-dest').classList.remove('empty');
+      setStatus('vc-status-dest', '✓ ok', 'ok');
+      updateExecuteButton();
+    } catch (e) {
+      if (e.name !== 'AbortError') alert('Erro ao selecionar destino: ' + e.message);
+    }
+  });
+
+  // ---- Paste detection
+  pasteArea.addEventListener('input', () => {
+    const paths = parsePaths(pasteArea.value);
+    if (paths.length > 0) {
+      setStatus('vc-status-paste', `${paths.length} caminho${paths.length > 1 ? 's' : ''}`, 'ok');
+    } else {
+      setStatus('vc-status-paste', '0 caminhos', '');
+    }
+    updateExecuteButton();
+  });
+
+  // ---- Clear
+  $('vc-btn-clear').addEventListener('click', () => {
+    pasteArea.value = '';
+    pasteArea.dispatchEvent(new Event('input'));
+  });
+
+  // ---- Execute
+  btnExecute.addEventListener('click', async () => {
+    if (!(await ensurePermission(vaultHandle, 'read'))) {
+      alert('Permissão de leitura negada para o vault.'); return;
+    }
+    if (!(await ensurePermission(destHandle, 'readwrite'))) {
+      alert('Permissão de escrita negada para a pasta destino.'); return;
+    }
+
+    const paths = parsePaths(pasteArea.value);
+    if (paths.length === 0) return;
+
+    let subName = $('vc-folder-name').value.trim();
+    if (!subName) {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      subName = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+    }
+    const subFolderName = `resultados-${subName}`;
+
+    let subDest;
+    try {
+      subDest = await destHandle.getDirectoryHandle(subFolderName, { create: true });
+      lastDestSubfolder = subFolderName;
+    } catch (e) {
+      alert('Erro ao criar subpasta: ' + e.message);
+      return;
+    }
+
+    const list = $('vc-list');
+    list.innerHTML = '';
+    $('vc-results').hidden = false;
+    btnExecute.disabled = true;
+    btnExecute.textContent = 'Copiando…';
+    btnExecute.classList.add('processing');
+
+    let ok = 0, fail = 0;
+    for (const relPath of paths) {
+      const li = document.createElement('li');
+      const tag = document.createElement('span');
+      const text = document.createElement('span');
+      tag.className = 'vc-tag';
+      li.appendChild(tag);
+      li.appendChild(text);
+      try {
+        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, relPath);
+        const file = await fileHandle.getFile();
+        const newHandle = await subDest.getFileHandle(fileName, { create: true });
+        const writable = await newHandle.createWritable();
+        await writable.write(file);
+        await writable.close();
+        li.className = 'ok';
+        tag.textContent = 'OK';
+        text.textContent = fileName;
+        ok++;
+      } catch (e) {
+        li.className = 'fail';
+        tag.textContent = 'FAIL';
+        text.textContent = `${relPath} — ${e.message}`;
+        fail++;
+      }
+      list.appendChild(li);
+      list.scrollTop = list.scrollHeight;
+    }
+
+    $('vc-summary').innerHTML = `
+      Copiados: <strong>${ok}</strong> de <strong>${paths.length}</strong>
+      ${fail > 0 ? `· Falhas: <strong style="color: var(--accent);">${fail}</strong>` : ''}<br>
+      Pasta: <code>${subFolderName}</code> dentro de <code>${destHandle.name}</code>
+    `;
+
+    btnExecute.disabled = false;
+    btnExecute.textContent = 'Copiar arquivos';
+    btnExecute.classList.remove('processing');
+    $('vc-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ---- Open dest (alert apenas; FSA não pode abrir Explorer)
+  $('vc-btn-open').addEventListener('click', () => {
+    if (!destHandle) { alert('Selecione a pasta destino primeiro.'); return; }
+    alert(
+      `Pasta criada: resultados-${lastDestSubfolder ? lastDestSubfolder.replace(/^resultados-/, '') : '???'}\n\n` +
+      `Dentro de "${destHandle.name}".\n\n` +
+      `O navegador não pode abrir o Explorer direto — vá até a pasta destino e procure pela subpasta.`
+    );
+  });
+
+  // ---- Reset
+  $('vc-btn-reset').addEventListener('click', async () => {
+    if (!confirm('Apagar pastas salvas (vault e destino)? A próxima abertura vai pedir pra selecionar de novo.')) return;
+    await idbClear();
+    vaultHandle = null; destHandle = null;
+    $('vc-path-vault').textContent = 'nenhuma pasta selecionada';
+    $('vc-path-vault').classList.add('empty');
+    $('vc-path-dest').textContent = 'nenhuma pasta selecionada';
+    $('vc-path-dest').classList.add('empty');
+    setStatus('vc-status-vault', 'pendente', '');
+    setStatus('vc-status-dest', 'pendente', '');
+    updateExecuteButton();
+  });
+
+  // ---- Restore handles
+  (async () => {
+    try {
+      const savedVault = await idbGet('vault');
+      if (savedVault) {
+        vaultHandle = savedVault;
+        $('vc-path-vault').textContent = savedVault.name;
+        $('vc-path-vault').classList.remove('empty');
+        const perm = await vaultHandle.queryPermission({ mode: 'read' });
+        if (perm === 'granted') {
+          setStatus('vc-status-vault', '✓ ok', 'ok');
+        } else {
+          setStatus('vc-status-vault', '⏳ autorizar', 'warn');
+          $('vc-path-vault').innerHTML = `${savedVault.name} <span class="vc-pill">restaurado</span>`;
+        }
+      }
+      const savedDest = await idbGet('dest');
+      if (savedDest) {
+        destHandle = savedDest;
+        $('vc-path-dest').textContent = savedDest.name;
+        $('vc-path-dest').classList.remove('empty');
+        const perm = await destHandle.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+          setStatus('vc-status-dest', '✓ ok', 'ok');
+        } else {
+          setStatus('vc-status-dest', '⏳ autorizar', 'warn');
+          $('vc-path-dest').innerHTML = `${savedDest.name} <span class="vc-pill">restaurado</span>`;
+        }
+      }
+      updateExecuteButton();
+    } catch (e) {
+      console.warn('Vault Copy: falha ao restaurar handles', e);
+    }
+  })();
+})();
 </script>
 
 </body>
