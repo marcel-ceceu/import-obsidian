@@ -34,8 +34,8 @@ A partir da v1.1, o `index.html` tem 2 abas. A aba **Import Pipeline** (original
 **Fluxo da aba Vault Copy:**
 1. Selecionar pasta do vault (`ClaudeMsgm`) — autoriza leitura
 2. Colar os resultados do "Copy search results" do Obsidian no textarea (cada linha vira um path relativo)
-3. Selecionar pasta destino (pai) + opcionalmente nomear a subpasta — autoriza escrita
-4. Clicar "Copiar arquivos" → cria `resultados-{nome ou timestamp}/` no destino com todos os `.md`
+3. Selecionar pasta destino **RESULTADOSGERAL** — autoriza escrita (`C:\Users\Windows\Desktop\Area Trabalho\RESULTADOSGERAL`)
+4. Clicar "Copiar arquivos" → cria subpasta **`DDMMYY-HHMM_msgm_obsidian`** (ex.: `220526-1003_msgm_obsidian`)
 
 **Decisões técnicas:**
 - Usa **File System Access API** (Chrome/Edge somente — Firefox/Safari mostram aviso e a aba 1 continua funcionando)
@@ -46,8 +46,10 @@ A partir da v1.1, o `index.html` tem 2 abas. A aba **Import Pipeline** (original
 
 **Abrir pasta destino no Explorer (v1.2):**
 - A File System Access API **não** expõe caminho absoluto nem abre o Explorer sozinha.
-- No passo 03, informe **uma vez** o caminho absoluto da pasta pai (ex.: `C:\Users\Windows\Desktop`) — fica salvo no IndexedDB deste browser.
-- Após copiar, o botão **Abrir pasta destino no Explorer** monta `pasta-pai\resultados-{nome}` e chama um **helper local** em `127.0.0.1`:
+- **Fonte padrão:** `C:\Users\Windows\Documents\ClaudeMsgm` (vault ClaudeMsgm)
+- **Destino padrão:** `C:\Users\Windows\Desktop\Area Trabalho\RESULTADOSGERAL` (hardcoded no HTML — sobrevive reset de cache)
+- **Subpasta:** sempre `DDMMYY-HHMM_msgm_obsidian` (nova a cada cópia)
+- Após copiar, o botão **Abrir pasta destino no Explorer** monta `RESULTADOSGERAL\DDMMYY-HHMM_msgm_obsidian` e chama um **helper local** em `127.0.0.1`:
   - `PJT-OBSIDIAN` → `http://127.0.0.1:5379/api/open-folder`
   - ou `node folder-opener.mjs` → porta **5380**
 - Se o helper estiver offline, o PWA copia o caminho completo e mostra modal (sem `alert` nativo).

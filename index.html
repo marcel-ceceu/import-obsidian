@@ -1219,8 +1219,9 @@ footer {
         <h3>Pasta do Vault</h3>
         <span class="vc-status" id="vc-status-vault">pendente</span>
       </div>
-      <button class="btn btn-ghost" id="vc-btn-vault" type="button">Selecionar pasta do vault</button>
-      <div class="vc-path empty" id="vc-path-vault">nenhuma pasta selecionada</div>
+      <button class="btn btn-ghost" id="vc-btn-vault" type="button">Selecionar vault ClaudeMsgm (fonte)</button>
+      <div class="vc-path empty" id="vc-path-vault">padrão: C:\Users\Windows\Documents\ClaudeMsgm</div>
+      <p class="vc-hint">Fonte oficial: <code>C:\Users\Windows\Documents\ClaudeMsgm</code> — autorize esta pasta no picker.</p>
     </section>
 
     <!-- Step 2: Paste -->
@@ -1243,13 +1244,12 @@ footer {
         <h3>Pasta destino</h3>
         <span class="vc-status" id="vc-status-dest">pendente</span>
       </div>
-      <button class="btn btn-ghost" id="vc-btn-dest" type="button">Selecionar pasta pai (ex: Desktop)</button>
-      <div class="vc-path empty" id="vc-path-dest">nenhuma pasta selecionada</div>
-      <label class="vc-label" for="vc-dest-abs-path">Caminho absoluto da pasta pai (Windows)</label>
-      <input type="text" class="vc-input" id="vc-dest-abs-path" placeholder="ex: C:\Users\Windows\Desktop" autocomplete="off" spellcheck="false">
-      <p class="vc-hint" id="vc-open-hint">A FSA só guarda o nome da pasta. Informe o caminho completo uma vez para abrir no Explorer.</p>
-      <label class="vc-label" for="vc-folder-name">Nome da subpasta (vazio = timestamp automático)</label>
-      <input type="text" class="vc-input" id="vc-folder-name" placeholder="ex: scorepositivo">
+      <button class="btn btn-ghost" id="vc-btn-dest" type="button">Selecionar pasta RESULTADOSGERAL (destino)</button>
+      <div class="vc-path empty" id="vc-path-dest">padrão: RESULTADOSGERAL</div>
+      <label class="vc-label" for="vc-dest-abs-path">Caminho absoluto da pasta destino (Windows)</label>
+      <input type="text" class="vc-input" id="vc-dest-abs-path" value="C:\Users\Windows\Desktop\Area Trabalho\RESULTADOSGERAL" autocomplete="off" spellcheck="false">
+      <p class="vc-hint" id="vc-open-hint">Destino fixo: Area Trabalho\RESULTADOSGERAL. Helper local abre a subpasta no Explorer.</p>
+      <p class="vc-hint">Nova subpasta a cada cópia: <code id="vc-subfolder-preview">220526-1003_msgm_obsidian</code> <span class="vc-pill">DDMMYY-HHMM_msgm_obsidian</span></p>
     </section>
 
     <!-- Execute -->
@@ -1780,10 +1780,16 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     return (await handle.requestPermission(opts)) === 'granted';
   }
 
-  const OPEN_FOLDER_HELPERS = [
-    'http://127.0.0.1:5379/api/open-folder',
-    'http://127.0.0.1:5380/api/open-folder',
+  const OPEN_FOLDER_BASES = [
+    'http://127.0.0.1:5380',
+    'http://127.0.0.1:5379',
   ];
+  const OPEN_FOLDER_HELPERS = OPEN_FOLDER_BASES.map((base) => `${base}/api/open-folder`);
+
+  const DEFAULT_VAULT_ABS = 'C:\\Users\\Windows\\Documents\\ClaudeMsgm';
+  const DEFAULT_DEST_ABS = 'C:\\Users\\Windows\\Desktop\\Area Trabalho\\RESULTADOSGERAL';
+
+  const $ = id => document.getElementById(id);
 
   // ---- State
   let vaultHandle = null;
@@ -1791,12 +1797,50 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   let lastDestSubfolder = null;
   let lastDestFullPath = null;
 
+  function buildSubfolderName(date) {
+    const d = date || new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const dd = pad(d.getDate());
+    const mm = pad(d.getMonth() + 1);
+    const yy = pad(d.getFullYear() % 100);
+    return `${dd}${mm}${yy}-${pad(d.getHours())}${pad(d.getMinutes())}_msgm_obsidian`;
+  }
+
+  function applyVcDefaults() {
+    $('vc-dest-abs-path').value = DEFAULT_DEST_ABS;
+    const preview = $('vc-subfolder-preview');
+    if (preview) preview.textContent = buildSubfolderName();
+    if (!vaultHandle) {
+      $('vc-path-vault').textContent = `padrão: ${DEFAULT_VAULT_ABS}`;
+      $('vc-path-vault').classList.add('empty');
+    }
+    if (!destHandle) {
+      $('vc-path-dest').textContent = 'padrão: RESULTADOSGERAL';
+      $('vc-path-dest').classList.add('empty');
+    }
+  }
+
+  function refreshSubfolderPreview() {
+    const preview = $('vc-subfolder-preview');
+    if (preview) preview.textContent = buildSubfolderName();
+  }
+
   function joinWinPath(base, leaf) {
     return base.replace(/[\\/]+$/, '') + '\\' + String(leaf).replace(/^\\+/, '');
   }
 
   function getDestAbsParent() {
-    return $('vc-dest-abs-path').value.trim();
+    const value = $('vc-dest-abs-path').value.trim();
+    return value || DEFAULT_DEST_ABS;
+  }
+
+  function tryOpenViaNavigation(folderPath) {
+    for (const base of OPEN_FOLDER_BASES) {
+      const url = `${base}/open?folderPath=${encodeURIComponent(folderPath)}`;
+      const popup = window.open(url, '_blank', 'noopener,noreferrer');
+      if (popup) return { ok: true, via: url, mode: 'navigate' };
+    }
+    return { ok: false };
   }
 
   function resolveLastDestFullPath() {
@@ -1820,9 +1864,22 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         clearTimeout(timer);
         if (!res.ok) continue;
         const data = await res.json();
-        if (data.ok) return { ok: true, via: url };
+        if (data.ok) return { ok: true, via: url, mode: 'fetch-post' };
       } catch {
         /* tenta próximo helper */
+      }
+    }
+    for (const base of OPEN_FOLDER_BASES) {
+      try {
+        const url = `${base}/open?folderPath=${encodeURIComponent(folderPath)}`;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 2500);
+        const res = await fetch(url, { method: 'GET', signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) continue;
+        return { ok: true, via: url, mode: 'fetch-get' };
+      } catch {
+        /* tenta próximo */
       }
     }
     return { ok: false };
@@ -1859,9 +1916,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   async function updateOpenHint() {
     const hint = $('vc-open-hint');
     if (!hint) return;
-    for (const url of OPEN_FOLDER_HELPERS) {
+    for (const base of OPEN_FOLDER_BASES) {
       try {
-        const healthUrl = url.replace('/api/open-folder', '/api/health');
+        const healthUrl = `${base}/api/health`;
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 1200);
         const res = await fetch(healthUrl, { signal: ctrl.signal });
@@ -1875,7 +1932,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         /* próximo */
       }
     }
-    hint.textContent = 'Sem helper local: rode node folder-opener.mjs (porta 5380) ou PJT-OBSIDIAN (5379).';
+    hint.textContent = 'Sem helper: duplo-clique em Iniciar-FolderOpener.cmd (porta 5380). Aceite permissão de rede local se o Chrome pedir.';
     hint.classList.remove('ok');
   }
 
@@ -1889,7 +1946,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 
   // ---- Elements
-  const $ = id => document.getElementById(id);
   const pasteArea = $('vc-paste');
   const btnExecute = $('vc-btn-execute');
 
@@ -1989,13 +2045,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const paths = parsePaths(pasteArea.value);
     if (paths.length === 0) return;
 
-    let subName = $('vc-folder-name').value.trim();
-    if (!subName) {
-      const d = new Date();
-      const pad = n => String(n).padStart(2, '0');
-      subName = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
-    }
-    const subFolderName = `resultados-${subName}`;
+    refreshSubfolderPreview();
+    const subFolderName = buildSubfolderName();
 
     let subDest;
     try {
@@ -2062,7 +2113,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   // ---- Open dest (helper local no Windows; FSA não abre Explorer sozinha)
   $('vc-btn-open').addEventListener('click', async () => {
     if (!destHandle) {
-      showVcOpenModal('Pasta destino', 'Selecione a pasta pai no passo 03 antes de abrir.', '');
+      showVcOpenModal('Pasta destino', 'Selecione RESULTADOSGERAL no passo 03 antes de abrir.', '');
       return;
     }
     if (!lastDestSubfolder) {
@@ -2071,19 +2122,20 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
 
     const parentAbs = getDestAbsParent();
-    if (!parentAbs) {
-      $('vc-dest-abs-path').focus();
-      showVcOpenModal(
-        'Caminho absoluto necessário',
-        'Informe o caminho completo da pasta pai (ex.: C:\\Users\\Windows\\Desktop). O navegador não expõe o path da pasta escolhida via FSA.',
-        lastDestSubfolder
-      );
-      return;
-    }
-
     const folderPath = resolveLastDestFullPath() || joinWinPath(parentAbs, lastDestSubfolder);
     lastDestFullPath = folderPath;
     await idbSet('lastDestFullPath', folderPath);
+
+    // window.open primeiro — preserva gesto do clique (HTTPS → localhost)
+    const navigated = tryOpenViaNavigation(folderPath);
+    if (navigated.ok) {
+      const hint = $('vc-open-hint');
+      if (hint) {
+        hint.textContent = 'Abrindo no Explorer… Feche a aba do helper se o browser abrir uma.';
+        hint.classList.add('ok');
+      }
+      return;
+    }
 
     const opened = await tryOpenFolderViaHelper(folderPath);
     if (opened.ok) {
@@ -2095,17 +2147,18 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       return;
     }
 
+    const explorerCmd = `explorer "${folderPath.replace(/"/g, '')}"`;
     try {
-      await navigator.clipboard.writeText(folderPath);
+      await navigator.clipboard.writeText(explorerCmd);
       showVcOpenModal(
-        'Helper offline — caminho copiado',
-        'Não foi possível contactar o helper em 127.0.0.1:5379 ou :5380. O caminho já está na área de transferência — Win+E e cole na barra de endereços.',
-        folderPath
+        'Helper offline — comando copiado',
+        'Inicie Iniciar-FolderOpener.cmd e tente de novo. Por agora: Win+R, Ctrl+V, Enter (comando explorer copiado).',
+        explorerCmd
       );
     } catch {
       showVcOpenModal(
         'Helper offline',
-        'Inicie node folder-opener.mjs ou PJT-OBSIDIAN e tente de novo. Caminho completo abaixo:',
+        'Duplo-clique em Iniciar-FolderOpener.cmd na pasta import-obsidian e tente de novo.',
         folderPath
       );
     }
@@ -2118,11 +2171,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     vaultHandle = null; destHandle = null;
     lastDestSubfolder = null;
     lastDestFullPath = null;
-    $('vc-dest-abs-path').value = '';
-    $('vc-path-vault').textContent = 'nenhuma pasta selecionada';
-    $('vc-path-vault').classList.add('empty');
-    $('vc-path-dest').textContent = 'nenhuma pasta selecionada';
-    $('vc-path-dest').classList.add('empty');
+    applyVcDefaults();
     setStatus('vc-status-vault', 'pendente', '');
     setStatus('vc-status-dest', 'pendente', '');
     updateExecuteButton();
@@ -2159,8 +2208,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       }
       const savedAbs = await idbGet('destAbsPath');
       if (savedAbs) $('vc-dest-abs-path').value = savedAbs;
+      else applyVcDefaults();
       const savedFull = await idbGet('lastDestFullPath');
       if (savedFull) lastDestFullPath = savedFull;
+      refreshSubfolderPreview();
       updateExecuteButton();
       updateOpenHint();
     } catch (e) {
