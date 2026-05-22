@@ -1248,7 +1248,7 @@ footer {
       <div class="vc-path empty" id="vc-path-dest">padrão: RESULTADOSGERAL</div>
       <label class="vc-label" for="vc-dest-abs-path">Caminho absoluto da pasta destino (Windows)</label>
       <input type="text" class="vc-input" id="vc-dest-abs-path" value="C:\Users\Windows\Desktop\Area Trabalho\RESULTADOSGERAL" autocomplete="off" spellcheck="false">
-      <p class="vc-hint" id="vc-open-hint">Destino fixo: Area Trabalho\RESULTADOSGERAL. Helper local abre a subpasta no Explorer.</p>
+      <p class="vc-hint" id="vc-open-hint">Destino fixo: Area Trabalho\RESULTADOSGERAL. Instale o protocolo msgm-folder uma vez para abrir direto no Explorer.</p>
       <p class="vc-hint">Nova subpasta a cada cópia: <code id="vc-subfolder-preview">220526-1003_msgm_obsidian</code> <span class="vc-pill">DDMMYY-HHMM_msgm_obsidian</span></p>
     </section>
 
@@ -1785,6 +1785,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     'http://127.0.0.1:5379',
   ];
   const OPEN_FOLDER_HELPERS = OPEN_FOLDER_BASES.map((base) => `${base}/api/open-folder`);
+  const MSGM_FOLDER_PROTOCOL = 'msgm-folder://open/';
 
   const DEFAULT_VAULT_ABS = 'C:\\Users\\Windows\\Documents\\ClaudeMsgm';
   const DEFAULT_DEST_ABS = 'C:\\Users\\Windows\\Desktop\\Area Trabalho\\RESULTADOSGERAL';
@@ -1841,6 +1842,16 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       if (popup) return { ok: true, via: url, mode: 'navigate' };
     }
     return { ok: false };
+  }
+
+  function buildMsgmFolderUrl(subFolderName) {
+    return `${MSGM_FOLDER_PROTOCOL}${encodeURIComponent(subFolderName)}`;
+  }
+
+  function tryOpenViaMsgmProtocol(subFolderName) {
+    const url = buildMsgmFolderUrl(subFolderName);
+    window.location.href = url;
+    return { ok: true, via: url, mode: 'protocol' };
   }
 
   function resolveLastDestFullPath() {
@@ -1916,24 +1927,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   async function updateOpenHint() {
     const hint = $('vc-open-hint');
     if (!hint) return;
-    for (const base of OPEN_FOLDER_BASES) {
-      try {
-        const healthUrl = `${base}/api/health`;
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 1200);
-        const res = await fetch(healthUrl, { signal: ctrl.signal });
-        clearTimeout(timer);
-        if (res.ok) {
-          hint.textContent = 'Helper local detectado — o botão abre o Explorer automaticamente.';
-          hint.classList.add('ok');
-          return;
-        }
-      } catch {
-        /* próximo */
-      }
-    }
-    hint.textContent = 'Sem helper: duplo-clique em Iniciar-FolderOpener.cmd (porta 5380). Aceite permissão de rede local se o Chrome pedir.';
-    hint.classList.remove('ok');
+    hint.textContent = 'Destino fixo: Area Trabalho\\RESULTADOSGERAL. Botão abre via protocolo msgm-folder://.';
+    hint.classList.add('ok');
   }
 
   $('vc-dest-abs-path').addEventListener('change', async () => {
@@ -2110,7 +2105,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     $('vc-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
-  // ---- Open dest (helper local no Windows; FSA não abre Explorer sozinha)
+  // ---- Open dest (protocolo Windows; fallback helper local)
   $('vc-btn-open').addEventListener('click', async () => {
     if (!destHandle) {
       showVcOpenModal('Pasta destino', 'Selecione RESULTADOSGERAL no passo 03 antes de abrir.', '');
@@ -2126,41 +2121,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     lastDestFullPath = folderPath;
     await idbSet('lastDestFullPath', folderPath);
 
-    // window.open primeiro — preserva gesto do clique (HTTPS → localhost)
-    const navigated = tryOpenViaNavigation(folderPath);
-    if (navigated.ok) {
-      const hint = $('vc-open-hint');
-      if (hint) {
-        hint.textContent = 'Abrindo no Explorer… Feche a aba do helper se o browser abrir uma.';
-        hint.classList.add('ok');
-      }
-      return;
-    }
-
-    const opened = await tryOpenFolderViaHelper(folderPath);
-    if (opened.ok) {
-      const hint = $('vc-open-hint');
-      if (hint) {
-        hint.textContent = 'Pasta aberta no Explorer.';
-        hint.classList.add('ok');
-      }
-      return;
-    }
-
-    const explorerCmd = `explorer "${folderPath.replace(/"/g, '')}"`;
-    try {
-      await navigator.clipboard.writeText(explorerCmd);
-      showVcOpenModal(
-        'Helper offline — comando copiado',
-        'Inicie Iniciar-FolderOpener.cmd e tente de novo. Por agora: Win+R, Ctrl+V, Enter (comando explorer copiado).',
-        explorerCmd
-      );
-    } catch {
-      showVcOpenModal(
-        'Helper offline',
-        'Duplo-clique em Iniciar-FolderOpener.cmd na pasta import-obsidian e tente de novo.',
-        folderPath
-      );
+    tryOpenViaMsgmProtocol(lastDestSubfolder);
+    const hint = $('vc-open-hint');
+    if (hint) {
+      hint.textContent = 'Abrindo no Explorer via protocolo msgm-folder. Se o Chrome perguntar, permita abrir.';
+      hint.classList.add('ok');
     }
   });
 

@@ -44,15 +44,15 @@ A partir da v1.1, o `index.html` tem 2 abas. A aba **Import Pipeline** (original
 - Lógica está embutida no mesmo `index.html` — sem build, sem arquivo extra
 - Service Worker bumpado pra `cv-sync-v1.1.0` neste release pra invalidar cache do cliente
 
-**Abrir pasta destino no Explorer (v1.2):**
+**Abrir pasta destino no Explorer (v1.4):**
 - A File System Access API **não** expõe caminho absoluto nem abre o Explorer sozinha.
 - **Fonte padrão:** `C:\Users\Windows\Documents\ClaudeMsgm` (vault ClaudeMsgm)
 - **Destino padrão:** `C:\Users\Windows\Desktop\Area Trabalho\RESULTADOSGERAL` (hardcoded no HTML — sobrevive reset de cache)
 - **Subpasta:** sempre `DDMMYY-HHMM_msgm_obsidian` (nova a cada cópia)
-- Após copiar, o botão **Abrir pasta destino no Explorer** monta `RESULTADOSGERAL\DDMMYY-HHMM_msgm_obsidian` e chama um **helper local** em `127.0.0.1`:
-  - `PJT-OBSIDIAN` → `http://127.0.0.1:5379/api/open-folder`
-  - ou `node folder-opener.mjs` → porta **5380**
-- Se o helper estiver offline, o PWA copia o caminho completo e mostra modal (sem `alert` nativo).
+- Após copiar, o botão **Abrir pasta destino no Explorer** chama o protocolo Windows **`msgm-folder://open/<subpasta>`**.
+- Instalar uma vez no PC: duplo-clique em **`Instalar-Protocolo-MsgmFolder.cmd`**.
+- O handler **`abrir-msgm-folder.ps1`** só aceita nomes no padrão `DDMMYY-HHMM_msgm_obsidian` e abre apenas dentro de `RESULTADOSGERAL`.
+- `folder-opener.mjs` fica como fallback/debug, mas o fluxo principal é o protocolo Windows.
 
 **O que NÃO faz:**
 - Não descobre sozinho o caminho absoluto da pasta escolhida via FSA (só o nome aparece)
@@ -120,6 +120,8 @@ Resolve `UnicodeEncodeError: 'charmap' codec` quando o `rich` (lib Python usada 
 | `manifest.json` | PWA manifest (instalável na desktop) |
 | `service-worker.js` | Cache offline (estratégia cache-first) |
 | `folder-opener.mjs` | Helper local opcional (porta 5380) para abrir pasta no Explorer a partir do PWA Vault Copy |
+| `Instalar-Protocolo-MsgmFolder.cmd` | Registra o protocolo Windows `msgm-folder://` no usuário atual |
+| `abrir-msgm-folder.ps1` | Handler seguro do protocolo; abre subpastas oficiais no Explorer |
 | `icon.svg` | Ícone do PWA (escalável) |
 | `icon-192.png`, `icon-512.png` | Ícones PWA fallback pra dispositivos legacy |
 | `vercel.json` | Headers e cache do Vercel |
