@@ -44,8 +44,16 @@ A partir da v1.1, o `index.html` tem 2 abas. A aba **Import Pipeline** (original
 - Lógica está embutida no mesmo `index.html` — sem build, sem arquivo extra
 - Service Worker bumpado pra `cv-sync-v1.1.0` neste release pra invalidar cache do cliente
 
+**Abrir pasta destino no Explorer (v1.2):**
+- A File System Access API **não** expõe caminho absoluto nem abre o Explorer sozinha.
+- No passo 03, informe **uma vez** o caminho absoluto da pasta pai (ex.: `C:\Users\Windows\Desktop`) — fica salvo no IndexedDB deste browser.
+- Após copiar, o botão **Abrir pasta destino no Explorer** monta `pasta-pai\resultados-{nome}` e chama um **helper local** em `127.0.0.1`:
+  - `PJT-OBSIDIAN` → `http://127.0.0.1:5379/api/open-folder`
+  - ou `node folder-opener.mjs` → porta **5380**
+- Se o helper estiver offline, o PWA copia o caminho completo e mostra modal (sem `alert` nativo).
+
 **O que NÃO faz:**
-- Não abre o Explorer do Windows (limitação da FSA — alerta o usuário com o nome da subpasta criada)
+- Não descobre sozinho o caminho absoluto da pasta escolhida via FSA (só o nome aparece)
 - Não suporta operações em mais de uma pasta destino simultâneamente
 - Não filtra conteúdo dos `.md` (copia byte-a-byte)
 
@@ -109,6 +117,7 @@ Resolve `UnicodeEncodeError: 'charmap' codec` quando o `rich` (lib Python usada 
 | `Clean-ClaudeVault.ps1` | Pipeline: detecta ZIP, extrai, patch tagging.py, sync, limpa `.md`, log |
 | `manifest.json` | PWA manifest (instalável na desktop) |
 | `service-worker.js` | Cache offline (estratégia cache-first) |
+| `folder-opener.mjs` | Helper local opcional (porta 5380) para abrir pasta no Explorer a partir do PWA Vault Copy |
 | `icon.svg` | Ícone do PWA (escalável) |
 | `icon-192.png`, `icon-512.png` | Ícones PWA fallback pra dispositivos legacy |
 | `vercel.json` | Headers e cache do Vercel |
