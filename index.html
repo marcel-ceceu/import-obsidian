@@ -976,6 +976,8 @@ footer {
 .vc-list li.ok .vc-tag { color: var(--ok); border: 1px solid var(--ok); }
 .vc-list li.fail { color: var(--accent-2); }
 .vc-list li.fail .vc-tag { color: var(--accent); border: 1px solid var(--accent); }
+.vc-list li.skip { color: var(--mute); }
+.vc-list li.skip .vc-tag { color: var(--warn); border: 1px solid var(--warn); }
 
 .vc-no-support {
   padding: 32px;
@@ -1201,7 +1203,7 @@ footer {
 
     <div class="vc-intro">
       <h2>Vault <em>Copy</em></h2>
-      <p>Pesquise no Obsidian, cole os resultados aqui, copie em massa pra outra pasta. Útil quando você quer extrair um lote de conversas pós-busca pra análise externa.</p>
+      <p>Pesquise no Obsidian, cole os resultados aqui, copie em massa pra outra pasta. Aceita Copy search results, caminhos do Explorer, wiki-links e paths relativos.</p>
     </div>
 
     <!-- Browser support warning (preenchido via JS se faltar suporte) -->
@@ -1228,10 +1230,10 @@ footer {
     <section class="vc-step" id="vc-step-2">
       <div class="vc-step-head">
         <span class="vc-step-num">02</span>
-        <h3>Resultados do Obsidian</h3>
+        <h3>Colar caminhos ou resultados</h3>
         <span class="vc-status" id="vc-status-paste">0 caminhos</span>
       </div>
-      <textarea class="vc-textarea" id="vc-paste" placeholder="Cole aqui (Ctrl+V) o output do 'Copy search results' do Obsidian.&#10;&#10;Exemplo:&#10;1. conversations/2026-04-21-Funcionamento.md&#10;2. conversations/2026-04-22-Consulta.md"></textarea>
+      <textarea class="vc-textarea" id="vc-paste" placeholder="Cole caminhos ou resultados de busca (Ctrl+V). Formatos aceites:&#10;&#10;1. conversations/2026-04-21-Funcionamento.md&#10;C:\Users\...\ClaudeMsgm\conversations\2026-04-22-Consulta.md&#10;[[2026-04-23-Topico]]&#10;2026-04-24-Nota.md"></textarea>
       <div class="vc-row">
         <button class="vc-link-btn" id="vc-btn-clear" type="button">limpar área de cola</button>
       </div>
@@ -1944,15 +1946,124 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   const pasteArea = $('vc-paste');
   const btnExecute = $('vc-btn-execute');
 
-  // ---- Parse de paths
-  function parsePaths(text) {
+  // ---- Parse de paths (multi-formato)
+  const WIN_RESERVED = new Set([
+    'CON', 'PRN', 'AUX', 'NUL',
+    'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+    'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+  ]);
+
+  function escapeRegex(s) {
+    return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function normalizeSlashes(s) {
+    return String(s).replace(/\\/g, '/');
+  }
+
+  function normalizeToVaultRelPath(raw, vaultName) {
+    let p = normalizeSlashes(raw.trim());
+    if (!/^[A-Za-z]:/.test(p)) {
+      return p.replace(/^\/+/, '');
+    }
+    const defaultNorm = normalizeSlashes(DEFAULT_VAULT_ABS).replace(/\/+$/, '');
+    const lower = p.toLowerCase();
+    const defaultLower = defaultNorm.toLowerCase();
+    if (lower === defaultLower) {
+      p = '';
+    } else if (lower.startsWith(defaultLower + '/')) {
+      p = p.slice(defaultNorm.length).replace(/^\/+/, '');
+    } else if (vaultName) {
+      const vaultPattern = new RegExp('^.*/' + escapeRegex(vaultName) + '/(.*)$', 'i');
+      const match = p.match(vaultPattern);
+      if (match) p = match[1];
+    }
+    if (/^[A-Za-z]:/.test(p)) {
+      const convIdx = p.toLowerCase().indexOf('/conversations/');
+      if (convIdx >= 0) p = p.slice(convIdx + 1);
+    }
+    return p.replace(/^\/+/, '');
+  }
+
+  function ensureConversationsPrefix(relPath) {
+    const normalized = normalizeSlashes(relPath).replace(/^\/+/, '');
+    if (!normalized.includes('/')) return `conversations/${normalized}`;
+    return normalized;
+  }
+
+  function isValidRelPath(relPath) {
+    const parts = normalizeSlashes(relPath).split('/').filter(p => p.length > 0);
+    if (parts.length === 0) return false;
+    if (!/\.md$/i.test(parts[parts.length - 1])) return false;
+    for (const part of parts) {
+      if (part === '.' || part === '..') return false;
+      if (part.includes(':')) return false;
+      if (/[.\s]$/.test(part)) return false;
+      const base = part.replace(/\.[^./\\]+$/, '').toUpperCase();
+      if (WIN_RESERVED.has(part.toUpperCase()) || WIN_RESERVED.has(base)) return false;
+    }
+    return true;
+  }
+
+  function parsePasteLine(line, vaultName) {
+    const sourceLine = line;
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('//')) {
+      return { sourceLine, status: 'skip', reason: 'linha vazia' };
+    }
+    if (/^\d+\s+results?$/i.test(trimmed)) {
+      return { sourceLine, status: 'skip', reason: 'metadata de busca' };
+    }
+
+    let text = trimmed
+      .replace(/^\s*\d+\.\s+/, '')
+      .replace(/^\s*[-*•]\s+/, '')
+      .replace(/^["']|["']$/g, '')
+      .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1')
+      .trim();
+
+    let format = 'relative';
+    let pathCandidate = text;
+
+    const wikiMatch = text.match(/^\[\[([^\]|]+)(?:\|[^\]]*)?\]\]$/);
+    if (wikiMatch) {
+      pathCandidate = wikiMatch[1].trim();
+      format = 'wikilink';
+      if (!/\.md$/i.test(pathCandidate)) pathCandidate += '.md';
+      pathCandidate = ensureConversationsPrefix(pathCandidate);
+    } else if (/^[A-Za-z]:[/\\]/.test(text)) {
+      format = 'absolute';
+      pathCandidate = normalizeToVaultRelPath(text, vaultName);
+    } else {
+      pathCandidate = normalizeSlashes(text).replace(/^\/+/, '');
+      if (!pathCandidate.includes('/')) {
+        format = 'basename';
+        pathCandidate = ensureConversationsPrefix(pathCandidate);
+      }
+    }
+
+    pathCandidate = normalizeSlashes(pathCandidate).replace(/^\/+/, '');
+
+    if (!isValidRelPath(pathCandidate)) {
+      return {
+        sourceLine,
+        status: 'skip',
+        reason: 'sem caminho de ficheiro reconhecido',
+        format,
+      };
+    }
+
+    return { sourceLine, relPath: pathCandidate, format, status: 'ok' };
+  }
+
+  function parsePasteLines(text, vaultName) {
     return text.split(/\r?\n/)
-      .map(line => {
-        let p = line.replace(/^\s*\d+\.\s+/, '').trim();
-        p = p.replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, '$1');
-        return p;
-      })
-      .filter(p => p.length > 0 && !p.startsWith('//'));
+      .filter(line => line.trim().length > 0)
+      .map(line => parsePasteLine(line, vaultName));
+  }
+
+  function getPasteEntries() {
+    return parsePasteLines(pasteArea.value, vaultHandle?.name || null);
   }
 
   // ---- Navega no vault até o arquivo
@@ -1963,7 +2074,15 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const fileName = parts.pop();
     let dir = rootHandle;
     for (const part of parts) {
-      dir = await dir.getDirectoryHandle(part);
+      try {
+        dir = await dir.getDirectoryHandle(part);
+      } catch (e) {
+        let msg = e.message || String(e);
+        if (msg.includes('Name is not allowed')) {
+          msg += ' — path ainda parece absoluto ou inválido; verifique o prefixo do vault';
+        }
+        throw new Error(msg);
+      }
     }
     return { fileHandle: await dir.getFileHandle(fileName), fileName };
   }
@@ -1979,8 +2098,25 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   }
 
   function updateExecuteButton() {
-    const paths = parsePaths(pasteArea.value);
-    btnExecute.disabled = !(vaultHandle && destHandle && paths.length > 0);
+    const entries = getPasteEntries();
+    const okCount = entries.filter(e => e.status === 'ok').length;
+    btnExecute.disabled = !(vaultHandle && destHandle && okCount > 0);
+  }
+
+  function updatePasteStatus() {
+    const entries = getPasteEntries();
+    const okCount = entries.filter(e => e.status === 'ok').length;
+    const skipCount = entries.filter(e => e.status === 'skip').length;
+    if (okCount > 0) {
+      let label = `${okCount} caminho${okCount > 1 ? 's' : ''}`;
+      if (skipCount > 0) label += ` · ${skipCount} ignorado${skipCount > 1 ? 's' : ''}`;
+      setStatus('vc-status-paste', label, 'ok');
+    } else if (skipCount > 0) {
+      setStatus('vc-status-paste', `${skipCount} ignorado${skipCount > 1 ? 's' : ''}`, 'warn');
+    } else {
+      setStatus('vc-status-paste', '0 caminhos', '');
+    }
+    updateExecuteButton();
   }
 
   // ---- Vault selection
@@ -1991,7 +2127,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       $('vc-path-vault').textContent = vaultHandle.name;
       $('vc-path-vault').classList.remove('empty');
       setStatus('vc-status-vault', '✓ ok', 'ok');
-      updateExecuteButton();
+      updatePasteStatus();
     } catch (e) {
       if (e.name !== 'AbortError') alert('Erro ao selecionar vault: ' + e.message);
     }
@@ -2012,15 +2148,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 
   // ---- Paste detection
-  pasteArea.addEventListener('input', () => {
-    const paths = parsePaths(pasteArea.value);
-    if (paths.length > 0) {
-      setStatus('vc-status-paste', `${paths.length} caminho${paths.length > 1 ? 's' : ''}`, 'ok');
-    } else {
-      setStatus('vc-status-paste', '0 caminhos', '');
-    }
-    updateExecuteButton();
-  });
+  pasteArea.addEventListener('input', updatePasteStatus);
 
   // ---- Clear
   $('vc-btn-clear').addEventListener('click', () => {
@@ -2037,8 +2165,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       alert('Permissão de escrita negada para a pasta destino.'); return;
     }
 
-    const paths = parsePaths(pasteArea.value);
-    if (paths.length === 0) return;
+    const entries = getPasteEntries();
+    const copyEntries = entries.filter(e => e.status === 'ok');
+    if (copyEntries.length === 0) return;
 
     refreshSubfolderPreview();
     const subFolderName = buildSubfolderName();
@@ -2064,16 +2193,27 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btnExecute.textContent = 'Copiando…';
     btnExecute.classList.add('processing');
 
-    let ok = 0, fail = 0;
-    for (const relPath of paths) {
+    let ok = 0, fail = 0, skip = 0;
+    for (const entry of entries) {
       const li = document.createElement('li');
       const tag = document.createElement('span');
       const text = document.createElement('span');
       tag.className = 'vc-tag';
       li.appendChild(tag);
       li.appendChild(text);
+
+      if (entry.status === 'skip') {
+        li.className = 'skip';
+        tag.textContent = 'SKIP';
+        text.textContent = `${entry.sourceLine.trim()} — ${entry.reason}`;
+        skip++;
+        list.appendChild(li);
+        list.scrollTop = list.scrollHeight;
+        continue;
+      }
+
       try {
-        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, relPath);
+        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, entry.relPath);
         const file = await fileHandle.getFile();
         const newHandle = await subDest.getFileHandle(fileName, { create: true });
         const writable = await newHandle.createWritable();
@@ -2086,7 +2226,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       } catch (e) {
         li.className = 'fail';
         tag.textContent = 'FAIL';
-        text.textContent = `${relPath} — ${e.message}`;
+        text.textContent = `${entry.relPath} — ${e.message}`;
         fail++;
       }
       list.appendChild(li);
@@ -2094,8 +2234,9 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
 
     $('vc-summary').innerHTML = `
-      Copiados: <strong>${ok}</strong> de <strong>${paths.length}</strong>
-      ${fail > 0 ? `· Falhas: <strong style="color: var(--accent);">${fail}</strong>` : ''}<br>
+      Copiados: <strong>${ok}</strong> de <strong>${copyEntries.length}</strong>
+      ${fail > 0 ? `· Falhas: <strong style="color: var(--accent);">${fail}</strong>` : ''}
+      ${skip > 0 ? `· Ignorados: <strong style="color: var(--warn);">${skip}</strong>` : ''}<br>
       Pasta: <code>${subFolderName}</code> dentro de <code>${destHandle.name}</code>
     `;
 
@@ -2139,7 +2280,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     applyVcDefaults();
     setStatus('vc-status-vault', 'pendente', '');
     setStatus('vc-status-dest', 'pendente', '');
-    updateExecuteButton();
+    updatePasteStatus();
   });
 
   // ---- Restore handles
@@ -2177,7 +2318,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       const savedFull = await idbGet('lastDestFullPath');
       if (savedFull) lastDestFullPath = savedFull;
       refreshSubfolderPreview();
-      updateExecuteButton();
+      updatePasteStatus();
       updateOpenHint();
     } catch (e) {
       console.warn('Vault Copy: falha ao restaurar handles', e);
