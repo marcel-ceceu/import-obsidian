@@ -31,13 +31,21 @@ try {
   }
 
   $leaf = [System.Uri]::UnescapeDataString($leaf)
+  $resolvedBase = [System.IO.Path]::GetFullPath($baseDir)
+
+  if ($leaf -eq 'RESULTADOSGERAL') {
+    if (-not (Test-Path -LiteralPath $resolvedBase -PathType Container)) {
+      New-Item -ItemType Directory -Path $resolvedBase -Force | Out-Null
+    }
+    Start-Process explorer.exe -ArgumentList "`"$resolvedBase`""
+    exit 0
+  }
 
   if ($leaf -notmatch '^\d{6}-\d{4}_msgm_obsidian$') {
     throw "Nome de pasta nao permitido: $leaf"
   }
 
   $target = Join-Path $baseDir $leaf
-  $resolvedBase = [System.IO.Path]::GetFullPath($baseDir)
   $resolvedTarget = [System.IO.Path]::GetFullPath($target)
 
   if (-not $resolvedTarget.StartsWith($resolvedBase, [System.StringComparison]::OrdinalIgnoreCase)) {

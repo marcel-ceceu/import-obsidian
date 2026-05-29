@@ -2,7 +2,7 @@
 // Cache-first strategy para assets estáticos.
 // Pra forçar update após deploy: incrementar CACHE_VERSION abaixo.
 
-const CACHE_VERSION = 'cv-sync-v1.7.5';
+const CACHE_VERSION = 'cv-sync-v1.7.8';
 const ASSETS = [
   './',
   './index.html',
