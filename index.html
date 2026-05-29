@@ -1250,10 +1250,10 @@ footer {
         <span class="vc-status" id="vc-status-dest">pendente</span>
       </div>
       <button class="btn btn-ghost" id="vc-btn-dest" type="button">Selecionar pasta RESULTADOSGERAL (destino)</button>
-      <div class="vc-path empty" id="vc-path-dest">padrão: RESULTADOSGERAL</div>
+      <div class="vc-path empty" id="vc-path-dest">padrão: C:\Users\Windows\Desktop\Area Trabalho\RESULTADOSGERAL</div>
       <label class="vc-label" for="vc-dest-abs-path">Caminho absoluto da pasta destino (Windows)</label>
       <input type="text" class="vc-input" id="vc-dest-abs-path" value="C:\Users\Windows\Desktop\Area Trabalho\RESULTADOSGERAL" autocomplete="off" spellcheck="false">
-      <p class="vc-hint" id="vc-open-hint">Destino fixo: Area Trabalho\RESULTADOSGERAL. Instale o protocolo msgm-folder uma vez para abrir direto no Explorer.</p>
+      <p class="vc-hint" id="vc-open-hint">Destino fixo: Area Trabalho\RESULTADOSGERAL. Na primeira vez, clique em Copiar ou no botão acima — o Chrome pede autorização da pasta.</p>
       <p class="vc-hint">Nova subpasta a cada cópia: <code id="vc-subfolder-preview">220526-1003_msgm_obsidian</code> <span class="vc-pill">DDMMYY-HHMM_msgm_obsidian</span></p>
     </section>
 
@@ -1264,6 +1264,10 @@ footer {
 
     <div class="vc-execute-wrap" style="margin-top:12px;">
       <button class="vc-execute" id="vc-btn-merge" type="button" disabled>Gerar consolidado (1 .md, sem IA)</button>
+    </div>
+
+    <div class="vc-execute-wrap" style="margin-top:12px;">
+      <button class="vc-execute" id="vc-btn-merge-ai" type="button" disabled>Gerar consolidado (com IA · Sonnet)</button>
     </div>
 
     <!-- Results -->
@@ -1294,7 +1298,7 @@ footer {
     <div class="vc-modal-backdrop" id="vc-modal-config" hidden>
       <div class="vc-modal" role="dialog" aria-labelledby="vc-cfg-title">
         <h4 id="vc-cfg-title">Configurações do Merge</h4>
-        <p>Modelo de resumo: <strong>Claude Sonnet</strong> (string definida na Fase 2).</p>
+        <p>Modelo de resumo: <strong>Claude Sonnet</strong> (<code>claude-sonnet-4-6</code>).</p>
 
         <label class="vc-label" for="vc-cfg-prompt">Prompt de resumo (editável)</label>
         <textarea class="vc-textarea" id="vc-cfg-prompt" style="min-height:200px;"></textarea>
@@ -1856,8 +1860,42 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       $('vc-path-vault').classList.add('empty');
     }
     if (!destHandle) {
-      $('vc-path-dest').textContent = 'padrão: RESULTADOSGERAL';
+      $('vc-path-dest').textContent = `padrão: ${DEFAULT_DEST_ABS}`;
       $('vc-path-dest').classList.add('empty');
+    }
+  }
+
+  async function pickVaultIfNeeded() {
+    if (vaultHandle && (await ensurePermission(vaultHandle, 'read'))) return true;
+    try {
+      vaultHandle = await window.showDirectoryPicker({ id: 'vault-picker', mode: 'read' });
+      await idbSet('vault', vaultHandle);
+      $('vc-path-vault').textContent = vaultHandle.name;
+      $('vc-path-vault').classList.remove('empty');
+      setStatus('vc-status-vault', '✓ ok', 'ok');
+      updatePasteStatus();
+      return true;
+    } catch (e) {
+      if (e.name !== 'AbortError') alert('Erro ao selecionar vault: ' + e.message);
+      return false;
+    }
+  }
+
+  async function pickDestIfNeeded() {
+    if (destHandle && (await ensurePermission(destHandle, 'readwrite'))) return true;
+    try {
+      destHandle = await window.showDirectoryPicker({ id: 'dest-picker', mode: 'readwrite' });
+      await idbSet('dest', destHandle);
+      $('vc-path-dest').textContent = destHandle.name;
+      $('vc-path-dest').classList.remove('empty');
+      setStatus('vc-status-dest', '✓ ok', 'ok');
+      const absPath = getDestAbsParent();
+      if (absPath) await idbSet('destAbsPath', absPath);
+      updateExecuteButton();
+      return true;
+    } catch (e) {
+      if (e.name !== 'AbortError') alert('Erro ao selecionar destino: ' + e.message);
+      return false;
     }
   }
 
@@ -2164,10 +2202,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   function updateExecuteButton() {
     const entries = getPasteEntries();
     const okCount = entries.filter(e => e.status === 'ok').length;
-    const ready = !!(vaultHandle && destHandle && okCount > 0);
+    const ready = okCount > 0;
     btnExecute.disabled = !ready;
-    const m = $('vc-btn-merge');
-    if (m) m.disabled = !ready;
+    ['vc-btn-merge', 'vc-btn-merge-ai'].forEach(id => {
+      const b = $(id);
+      if (b) b.disabled = !ready;
+    });
   }
 
   function updatePasteStatus() {
@@ -2250,32 +2290,77 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     return m ? m[1] : '';
   }
 
-  async function runMerge() {
-    if (!(await ensurePermission(vaultHandle, 'read'))) {
-      alert('Permissão de leitura negada para o vault.');
+  const AI_MODEL = 'claude-sonnet-4-6';
+  const AI_MAX_TOKENS = 700;
+  const AI_INPUT_CHARS = 12000;
+
+  async function summarizeConversation(content) {
+    const trecho = content.slice(0, AI_INPUT_CHARS);
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: AI_MODEL,
+        max_tokens: AI_MAX_TOKENS,
+        system: mergePrompt,
+        messages: [{ role: 'user', content: trecho }],
+      }),
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const txt = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    const clean = txt.replace(/```json|```/g, '').trim();
+    try { return JSON.parse(clean); } catch { return { titulo: '', resumo: clean }; }
+  }
+
+  async function runMerge(useAI) {
+    if (useAI && !apiKey) {
+      alert('Configure a chave em "Configurações do Merge".');
       return;
     }
-    if (!(await ensurePermission(destHandle, 'readwrite'))) {
-      alert('Permissão de escrita negada para o destino.');
-      return;
-    }
+    if (!(await pickVaultIfNeeded())) return;
+    if (!(await pickDestIfNeeded())) return;
 
     const entries = getPasteEntries().filter(e => e.status === 'ok');
     if (!entries.length) return;
 
-    const btn = $('vc-btn-merge');
+    const btn = useAI ? $('vc-btn-merge-ai') : $('vc-btn-merge');
+    const btnLabel = useAI
+      ? 'Gerar consolidado (com IA · Sonnet)'
+      : 'Gerar consolidado (1 .md, sem IA)';
+    const busyLabel = useAI ? 'Gerando com IA…' : 'Gerando…';
+
     btn.disabled = true;
-    btn.textContent = 'Gerando…';
+    btn.textContent = busyLabel;
     btn.classList.add('processing');
+    const otherMergeId = useAI ? 'vc-btn-merge' : 'vc-btn-merge-ai';
+    const otherBtn = $(otherMergeId);
+    if (otherBtn) otherBtn.disabled = true;
 
     const convs = [];
     for (const e of entries) {
       try {
         const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath);
         const content = await (await fileHandle.getFile()).text();
-        convs.push({ fileName, title: extractTitle(content, fileName), date: fileDate(fileName), content });
+        let title = extractTitle(content, fileName);
+        let resumo = '';
+        if (useAI && apiKey) {
+          try {
+            const r = await summarizeConversation(content);
+            if (r.titulo) title = r.titulo;
+            resumo = (r.resumo || '').trim();
+          } catch (err) {
+            resumo = '';
+          }
+        }
+        convs.push({ fileName, title, date: fileDate(fileName), content, resumo });
       } catch (err) {
-        convs.push({ fileName: e.relPath, title: e.relPath, date: '', content: '', erro: err.message });
+        convs.push({ fileName: e.relPath, title: e.relPath, date: '', content: '', resumo: '', erro: err.message });
       }
     }
     convs.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
@@ -2284,11 +2369,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const now = new Date();
     const human = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-    let capa = `# Consolidado — ${convs.length} conversas\n> Gerado em ${human} · fonte: vault ClaudeMsgm\n\n## Sumário\n`;
+    let capa = `# Consolidado — ${convs.length} conversas\n> Gerado em ${human} · fonte: vault ClaudeMsgm${useAI ? ' · resumos via Claude Sonnet' : ''}\n\n## Sumário\n`;
     let corpo = `\n---\n# TRANSCRIÇÕES\n`;
     convs.forEach((c, i) => {
       const id = `conv-${pad(i + 1)}`;
-      capa += `\n### [${id}] ${c.title}\n_resumo pendente (Fase 2)_\n`;
+      const linhaResumo = c.resumo ? c.resumo : '_resumo pendente (Fase 2)_';
+      capa += `\n### [${id}] ${c.title}\n${linhaResumo}\n`;
       corpo += `\n## [${id}] ${c.title}\n\n${c.content}\n`;
     });
     const md = capa + '\n' + corpo;
@@ -2302,8 +2388,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     } catch (err) {
       alert('Erro ao gravar o consolidado: ' + err.message);
       btn.disabled = false;
-      btn.textContent = 'Gerar consolidado (1 .md, sem IA)';
+      btn.textContent = btnLabel;
       btn.classList.remove('processing');
+      if (otherBtn) otherBtn.disabled = false;
+      updateExecuteButton();
       return;
     }
 
@@ -2313,32 +2401,33 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     $('vc-summary').innerHTML =
       `Consolidado: <strong>${okN}</strong> conversas` +
       (failN ? ` · <strong style="color:var(--accent);">${failN}</strong> com erro` : '') +
+      (useAI ? ' · <strong>com IA</strong>' : '') +
       `<br>Arquivo: <code>${outName}</code> em <code>${destHandle.name}</code>`;
     const list = $('vc-list');
     list.innerHTML = '';
     convs.forEach(c => {
       const li = document.createElement('li');
       li.className = c.erro ? 'fail' : 'ok';
-      li.innerHTML = `<span class="vc-tag">${c.erro ? 'FAIL' : 'OK'}</span><span>${c.title}${c.erro ? ' — ' + c.erro : ''}</span>`;
+      const resumoHint = useAI && !c.erro && !c.resumo ? ' · resumo indisponível' : '';
+      li.innerHTML = `<span class="vc-tag">${c.erro ? 'FAIL' : 'OK'}</span><span>${c.title}${c.erro ? ' — ' + c.erro : resumoHint}</span>`;
       list.appendChild(li);
     });
 
     btn.disabled = false;
-    btn.textContent = 'Gerar consolidado (1 .md, sem IA)';
+    btn.textContent = btnLabel;
     btn.classList.remove('processing');
+    if (otherBtn) otherBtn.disabled = false;
+    updateExecuteButton();
     $('vc-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  $('vc-btn-merge').addEventListener('click', runMerge);
+  $('vc-btn-merge').addEventListener('click', () => runMerge(false));
+  $('vc-btn-merge-ai').addEventListener('click', () => runMerge(true));
 
   // ---- Execute
   btnExecute.addEventListener('click', async () => {
-    if (!(await ensurePermission(vaultHandle, 'read'))) {
-      alert('Permissão de leitura negada para o vault.'); return;
-    }
-    if (!(await ensurePermission(destHandle, 'readwrite'))) {
-      alert('Permissão de escrita negada para a pasta destino.'); return;
-    }
+    if (!(await pickVaultIfNeeded())) return;
+    if (!(await pickDestIfNeeded())) return;
 
     const entries = getPasteEntries();
     const copyEntries = entries.filter(e => e.status === 'ok');
