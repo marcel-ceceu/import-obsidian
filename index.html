@@ -861,6 +861,95 @@ footer {
   color: var(--ink);
 }
 
+.vc-modal-progress {
+  width: min(560px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.vc-prog-phase {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.vc-prog-pct {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+.vc-prog-step {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--mute);
+  margin: 0 0 10px;
+  letter-spacing: 0.06em;
+}
+.vc-prog-bar {
+  height: 4px;
+  background: var(--line);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.vc-prog-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+.vc-prog-list {
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 12px 0;
+}
+.vc-prog-footer {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--mute);
+  word-break: break-word;
+}
+.vc-list li.run { color: var(--ink-2); }
+.vc-list li.run .vc-tag {
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  animation: vcProgPulse 1.2s ease-in-out infinite;
+}
+@keyframes vcProgPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.vc-modal-progress.vc-prog-fail h4 { color: var(--accent); }
+
+.vc-cfg-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+  margin: 0 0 16px;
+}
+.vc-cfg-tab {
+  flex: 1;
+  padding: 10px 12px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font-family: 'Geist', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--mute);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.vc-cfg-tab:hover { color: var(--ink-2); }
+.vc-cfg-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.vc-cfg-panel[hidden] { display: none; }
+
 .vc-row {
   display: flex;
   gap: 12px;
@@ -1206,6 +1295,7 @@ footer {
       <p>Pesquise no Obsidian, cole os resultados aqui, copie em massa pra outra pasta. Aceita Copy search results, caminhos do Explorer, wiki-links e paths relativos.</p>
       <div class="vc-row" style="margin-top:16px;">
         <button class="btn btn-ghost" id="vc-btn-config" type="button">Configurações do Merge</button>
+        <button class="btn btn-ghost" id="vc-btn-favorites" type="button">Prompts favoritos</button>
       </div>
     </div>
 
@@ -1300,16 +1390,63 @@ footer {
         <h4 id="vc-cfg-title">Configurações do Merge</h4>
         <p>Modelo de resumo: <strong>Claude Sonnet</strong> (<code>claude-sonnet-4-6</code>).</p>
 
-        <label class="vc-label" for="vc-cfg-prompt">Prompt de resumo (editável)</label>
+        <label class="vc-label" for="vc-cfg-prompt">Prompt activo no merge (editável)</label>
+        <div class="vc-row" style="margin-top:0; margin-bottom:8px;">
+          <button class="btn btn-ghost" id="vc-cfg-open-favorites" type="button">Abrir prompts favoritos</button>
+        </div>
         <textarea class="vc-textarea" id="vc-cfg-prompt" style="min-height:200px;"></textarea>
+        <p class="vc-hint">Presets incluídos e salvos por você ficam em <strong>Prompts favoritos</strong> (botão acima ou na página).</p>
 
-        <label class="vc-label" for="vc-cfg-key">Chave da API (só nesta sessão, não é salva)</label>
+        <label class="vc-label" for="vc-cfg-key">Chave da API Anthropic</label>
         <input type="password" class="vc-input" id="vc-cfg-key" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
-        <p class="vc-hint">A chave fica apenas em memória — não é gravada em disco nem commitada.</p>
+        <p class="vc-hint">Gravada neste browser (IndexedDB) — configure uma vez. Não vai para o Git nem para o servidor Vercel.</p>
 
         <div class="vc-row" style="margin-top:16px;">
           <button class="btn" id="vc-cfg-save" type="button">Salvar</button>
           <button class="btn btn-ghost" id="vc-cfg-close" type="button">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="vc-modal-backdrop" id="vc-modal-favorites" hidden>
+      <div class="vc-modal vc-modal-progress" role="dialog" aria-labelledby="vc-fav-title">
+        <h4 id="vc-fav-title">Prompts favoritos</h4>
+        <p class="vc-hint" style="margin-top:0;">Dois presets incluídos + os que você salvar. Escolha, edite e aplique ao merge.</p>
+
+        <label class="vc-label" for="vc-fav-preset">Selecionar preset</label>
+        <div class="vc-row" style="margin-top:0; align-items:flex-end;">
+          <select class="vc-input" id="vc-fav-preset" style="flex:1; min-width:0;"></select>
+          <button class="btn btn-ghost" id="vc-fav-preset-del" type="button" hidden>Apagar</button>
+        </div>
+
+        <label class="vc-label" for="vc-fav-prompt">Texto do preset</label>
+        <textarea class="vc-textarea" id="vc-fav-prompt" style="min-height:180px;"></textarea>
+
+        <label class="vc-label" for="vc-fav-preset-name">Salvar como novo preset</label>
+        <div class="vc-row" style="margin-top:0;">
+          <input type="text" class="vc-input" id="vc-fav-preset-name" placeholder="Nome do preset" style="flex:1; min-width:0;" autocomplete="off" spellcheck="false">
+          <button class="btn btn-ghost" id="vc-fav-preset-save" type="button">Salvar preset</button>
+        </div>
+
+        <div class="vc-row" style="margin-top:16px;">
+          <button class="btn" id="vc-fav-apply" type="button">Aplicar ao merge</button>
+          <button class="btn btn-ghost" id="vc-fav-close" type="button">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="vc-modal-backdrop" id="vc-modal-progress" hidden>
+      <div class="vc-modal vc-modal-progress" role="dialog" aria-labelledby="vc-prog-title">
+        <h4 id="vc-prog-title">A processar…</h4>
+        <p id="vc-prog-pct" class="vc-prog-pct">0%</p>
+        <p id="vc-prog-step" class="vc-prog-step"></p>
+        <p id="vc-prog-phase" class="vc-prog-phase"></p>
+        <div class="vc-prog-bar"><div class="vc-prog-bar-fill" id="vc-prog-bar-fill"></div></div>
+        <p id="vc-prog-counter" class="vc-hint"></p>
+        <ul class="vc-list vc-prog-list" id="vc-prog-list"></ul>
+        <div class="vc-prog-footer" id="vc-prog-footer"></div>
+        <div class="vc-row" id="vc-prog-actions" hidden>
+          <button class="btn btn-ghost" id="vc-prog-close" type="button">Fechar</button>
         </div>
       </div>
     </div>
@@ -1795,6 +1932,15 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       req.onerror = () => reject(req.error);
     });
   }
+  async function idbDelete(key) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  }
   async function idbClear() {
     const db = await openDB();
     return new Promise((resolve, reject) => {
@@ -1830,7 +1976,17 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   let lastDestSubfolder = null;
   let lastDestFullPath = null;
 
-  const DEFAULT_PROMPT = [
+  const PROMPT_CONSOLIDADO = [
+    'Você recebe a transcrição de uma conversa entre um usuário e a IA.',
+    'Produza, em português, com base apenas no que está na conversa:',
+    '- titulo: um título curto e claro;',
+    '- resumo: até 200 palavras, cobrindo o problema, as decisões (priorize a FINAL) e os pontos-chave;',
+    '- tags: até 20 itens identificadores — nomes próprios, ferramentas, temas, áreas.',
+    'Não invente nada fora da conversa.',
+    'Responda APENAS em JSON: {"titulo":"...","resumo":"...","tags":["...","..."]} sem texto extra.',
+  ].join('\n');
+
+  const PROMPT_CLASSICO = [
     'Você recebe a transcrição de uma conversa entre um usuário e a IA.',
     'Escreva um resumo objetivo em português, no máximo 500 palavras, cobrindo:',
     'o problema tratado, as decisões tomadas (priorize a decisão FINAL, não as',
@@ -1839,8 +1995,16 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     'Responda APENAS em JSON: {"titulo":"...","resumo":"..."} sem texto extra.',
   ].join('\n');
 
+  const BUILTIN_PROMPTS = [
+    { id: 'builtin-consolidado', name: 'Consolidado — índice, tags (200 pal)', text: PROMPT_CONSOLIDADO },
+    { id: 'builtin-classico', name: 'Clássico — título + resumo (500 pal)', text: PROMPT_CLASSICO },
+  ];
+
+  const DEFAULT_PROMPT = PROMPT_CONSOLIDADO;
+
   let apiKey = '';
   let mergePrompt = DEFAULT_PROMPT;
+  let savedPrompts = [];
 
   function buildSubfolderName(date) {
     const d = date || new Date();
@@ -2002,10 +2166,93 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
   });
 
+  async function loadSavedPromptsFromIdb() {
+    try {
+      const list = await idbGet('savedPrompts');
+      savedPrompts = Array.isArray(list) ? list : [];
+    } catch {
+      savedPrompts = [];
+    }
+  }
+
+  function getAllPresets() {
+    return [...BUILTIN_PROMPTS, ...savedPrompts];
+  }
+
+  function findPreset(id) {
+    return getAllPresets().find(p => p.id === id) || null;
+  }
+
+  function syncFavPresetDeleteButton() {
+    const sel = $('vc-fav-preset');
+    const del = $('vc-fav-preset-del');
+    if (!sel || !del) return;
+    const id = sel.value;
+    del.hidden = !savedPrompts.some(p => p.id === id);
+  }
+
+  function renderFavPresetSelect(selectedId) {
+    const sel = $('vc-fav-preset');
+    if (!sel) return;
+    sel.innerHTML = '';
+    const g1 = document.createElement('optgroup');
+    g1.label = 'Incluídos';
+    BUILTIN_PROMPTS.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      g1.appendChild(opt);
+    });
+    sel.appendChild(g1);
+    if (savedPrompts.length) {
+      const g2 = document.createElement('optgroup');
+      g2.label = 'Salvos por você';
+      savedPrompts.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        g2.appendChild(opt);
+      });
+      sel.appendChild(g2);
+    }
+    if (selectedId && findPreset(selectedId)) sel.value = selectedId;
+    else if (BUILTIN_PROMPTS.length) sel.value = BUILTIN_PROMPTS[0].id;
+    syncFavPresetDeleteButton();
+  }
+
+  function applyPresetToFavTextarea(id) {
+    const preset = findPreset(id);
+    if (!preset) return;
+    $('vc-fav-prompt').value = preset.text;
+    $('vc-fav-preset').value = id;
+    syncFavPresetDeleteButton();
+  }
+
+  async function openFavoritesModal() {
+    await loadSavedPromptsFromIdb();
+    let selectedPreset = 'builtin-consolidado';
+    try {
+      const lastId = await idbGet('mergePromptPresetId');
+      if (lastId && findPreset(lastId)) selectedPreset = lastId;
+    } catch { /* ignore */ }
+    renderFavPresetSelect(selectedPreset);
+    applyPresetToFavTextarea($('vc-fav-preset').value);
+    $('vc-fav-preset-name').value = '';
+    $('vc-modal-favorites').hidden = false;
+  }
+
+  function closeFavoritesModal() {
+    $('vc-modal-favorites').hidden = true;
+  }
+
   async function openConfigModal() {
     try {
       const saved = await idbGet('mergePrompt');
       if (saved) mergePrompt = saved;
+    } catch { /* ignore */ }
+    try {
+      const savedKey = await idbGet('apiKey');
+      if (savedKey) apiKey = savedKey;
     } catch { /* ignore */ }
     $('vc-cfg-prompt').value = mergePrompt;
     $('vc-cfg-key').value = apiKey;
@@ -2017,14 +2264,91 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   }
 
   $('vc-btn-config').addEventListener('click', openConfigModal);
+  $('vc-btn-favorites').addEventListener('click', openFavoritesModal);
+
+  $('vc-cfg-open-favorites').addEventListener('click', () => {
+    closeConfigModal();
+    openFavoritesModal();
+  });
+
   $('vc-cfg-close').addEventListener('click', closeConfigModal);
   $('vc-modal-config').addEventListener('click', (e) => {
     if (e.target === $('vc-modal-config')) closeConfigModal();
   });
+
+  $('vc-fav-close').addEventListener('click', closeFavoritesModal);
+  $('vc-modal-favorites').addEventListener('click', (e) => {
+    if (e.target === $('vc-modal-favorites')) closeFavoritesModal();
+  });
+
+  $('vc-fav-preset').addEventListener('change', () => {
+    applyPresetToFavTextarea($('vc-fav-preset').value);
+  });
+
+  $('vc-fav-preset-save').addEventListener('click', async () => {
+    const name = $('vc-fav-preset-name').value.trim();
+    const text = $('vc-fav-prompt').value.trim();
+    if (!name) {
+      alert('Digite um nome para o preset.');
+      return;
+    }
+    if (!text) {
+      alert('O prompt está vazio.');
+      return;
+    }
+    const existing = savedPrompts.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+    const entry = {
+      id: existing >= 0 ? savedPrompts[existing].id : `user-${Date.now()}`,
+      name,
+      text,
+    };
+    if (existing >= 0) savedPrompts[existing] = entry;
+    else savedPrompts.push(entry);
+    try {
+      await idbSet('savedPrompts', savedPrompts);
+    } catch { /* ignore */ }
+    renderFavPresetSelect(entry.id);
+    applyPresetToFavTextarea(entry.id);
+    $('vc-fav-preset-name').value = '';
+  });
+
+  $('vc-fav-preset-del').addEventListener('click', async () => {
+    const id = $('vc-fav-preset').value;
+    if (!savedPrompts.some(p => p.id === id)) return;
+    if (!confirm('Apagar este preset salvo?')) return;
+    savedPrompts = savedPrompts.filter(p => p.id !== id);
+    try {
+      await idbSet('savedPrompts', savedPrompts);
+    } catch { /* ignore */ }
+    renderFavPresetSelect('builtin-consolidado');
+    applyPresetToFavTextarea($('vc-fav-preset').value);
+  });
+
+  $('vc-fav-apply').addEventListener('click', async () => {
+    const text = $('vc-fav-prompt').value.trim();
+    if (!text) {
+      alert('O prompt está vazio.');
+      return;
+    }
+    mergePrompt = text;
+    const presetId = $('vc-fav-preset').value;
+    try {
+      await idbSet('mergePrompt', mergePrompt);
+      if (presetId) await idbSet('mergePromptPresetId', presetId);
+    } catch { /* ignore */ }
+    const cfgTa = $('vc-cfg-prompt');
+    if (cfgTa) cfgTa.value = mergePrompt;
+    closeFavoritesModal();
+  });
+
   $('vc-cfg-save').addEventListener('click', async () => {
     mergePrompt = $('vc-cfg-prompt').value.trim() || DEFAULT_PROMPT;
     apiKey = $('vc-cfg-key').value.trim();
-    try { await idbSet('mergePrompt', mergePrompt); } catch { /* ignore */ }
+    try {
+      await idbSet('mergePrompt', mergePrompt);
+      if (apiKey) await idbSet('apiKey', apiKey);
+      else await idbDelete('apiKey');
+    } catch { /* ignore */ }
     closeConfigModal();
   });
 
@@ -2294,6 +2618,213 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   const AI_MAX_TOKENS = 700;
   const AI_INPUT_CHARS = 12000;
 
+  function mergeRelBase(relPath) {
+    return String(relPath).replace(/\\/g, '/').split('/').pop() || relPath;
+  }
+
+  function countMergeSteps(entries, useAI) {
+    return 1 + entries.length * (useAI ? 3 : 2) + 3;
+  }
+
+  function countCopySteps(entries) {
+    return 1 + entries.length;
+  }
+
+  const vcProgress = (() => {
+    let running = false;
+    let startedAt = 0;
+    let total = 0;
+    let totalSteps = 1;
+    let currentStep = 0;
+    let meta = {};
+    let itemEls = {};
+
+    const MODE_TITLE = {
+      copy: 'A copiar arquivos…',
+      merge: 'A gerar consolidado (sem IA)…',
+      'merge-ai': 'A gerar consolidado (com IA · Sonnet)…',
+    };
+
+    const STATE_TAG = {
+      wait: 'WAIT', read: 'LER', ai: 'IA', copy: 'CPY', ok: 'OK', fail: 'FAIL', skip: 'SKIP',
+    };
+
+    const STATE_CLASS = {
+      wait: 'run', read: 'run', ai: 'run', copy: 'run', ok: 'ok', fail: 'fail', skip: 'skip',
+    };
+
+    function formatElapsed(ms) {
+      const s = Math.floor(ms / 1000);
+      const m = Math.floor(s / 60);
+      return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+    }
+
+    function renderFooter() {
+      const footer = $('vc-prog-footer');
+      if (!footer) return;
+      const modeLabels = { copy: 'Cópia', merge: 'Consolidado sem IA', 'merge-ai': 'Consolidado com IA' };
+      const lines = [`Modo: ${modeLabels[meta.mode] || meta.mode || '—'}`];
+      if (meta.vaultName) lines.push(`Vault: ${meta.vaultName}`);
+      if (meta.destName) lines.push(`Destino: ${meta.destName}`);
+      if (meta.destAbs) lines.push(`Caminho: ${meta.destAbs}`);
+      if (meta.output) lines.push(`Output: ${meta.output}`);
+      if (meta.mode === 'merge-ai') lines.push(`Modelo: ${AI_MODEL}`);
+      if (startedAt) lines.push(`Tempo: ${formatElapsed(Date.now() - startedAt)}`);
+      footer.textContent = lines.join(' · ');
+    }
+
+    function setProgress(step, label) {
+      currentStep = Math.max(0, Math.min(step, totalSteps));
+      const pct = totalSteps > 0
+        ? Math.min(100, Math.max(1, Math.round((currentStep / totalSteps) * 100)))
+        : 1;
+      const pctEl = $('vc-prog-pct');
+      const stepEl = $('vc-prog-step');
+      const phaseEl = $('vc-prog-phase');
+      const fill = $('vc-prog-bar-fill');
+      const counter = $('vc-prog-counter');
+      if (pctEl) pctEl.textContent = `${pct}%`;
+      if (stepEl) stepEl.textContent = `Passo ${currentStep} de ${totalSteps}`;
+      if (phaseEl) phaseEl.textContent = label || '';
+      if (fill) fill.style.width = `${pct}%`;
+      if (counter) counter.textContent = `${pct}% concluído`;
+      renderFooter();
+    }
+
+    function bump(label) {
+      setProgress(currentStep + 1, label);
+    }
+
+    function open(opts) {
+      running = true;
+      startedAt = Date.now();
+      total = opts.total || 0;
+      totalSteps = opts.totalSteps || 1;
+      currentStep = 0;
+      meta = { mode: opts.mode, ...(opts.meta || {}) };
+      if (vaultHandle) meta.vaultName = meta.vaultName || vaultHandle.name;
+      if (destHandle) meta.destName = meta.destName || destHandle.name;
+      meta.destAbs = meta.destAbs || getDestAbsParent();
+      itemEls = {};
+
+      const modal = $('vc-modal-progress');
+      const dialog = modal?.querySelector('.vc-modal-progress');
+      if (dialog) dialog.classList.remove('vc-prog-fail');
+      $('vc-prog-title').textContent = MODE_TITLE[opts.mode] || 'A processar…';
+      $('vc-prog-list').innerHTML = '';
+      $('vc-prog-actions').hidden = true;
+      modal.hidden = false;
+      setProgress(0, 'A iniciar…');
+    }
+
+    function initItems(items) {
+      const list = $('vc-prog-list');
+      list.innerHTML = '';
+      itemEls = {};
+      items.forEach((item, i) => {
+        const id = item.id || `item-${i}`;
+        const li = document.createElement('li');
+        li.className = 'run';
+        li.dataset.id = id;
+        li.innerHTML = `<span class="vc-tag">WAIT</span><span data-base-label="${escapeAttr(item.label)}">${item.label}</span>`;
+        list.appendChild(li);
+        itemEls[id] = li;
+      });
+    }
+
+    function escapeAttr(s) {
+      return String(s).replace(/"/g, '&quot;');
+    }
+
+    function setPhase(phaseId, label) {
+      bump(label);
+    }
+
+    function setItem(id, { state, detail }) {
+      const li = itemEls[id];
+      if (!li) return;
+      const tag = li.querySelector('.vc-tag');
+      const text = li.querySelector('span:last-child');
+      li.className = STATE_CLASS[state] || 'run';
+      if (tag) tag.textContent = STATE_TAG[state] || '…';
+      if (text) {
+        const base = text.dataset.baseLabel || text.textContent.split(' — ')[0];
+        if (!text.dataset.baseLabel) text.dataset.baseLabel = base;
+        text.textContent = detail ? `${base} — ${detail}` : base;
+      }
+      tickElapsed();
+      const list = $('vc-prog-list');
+      if (list) list.scrollTop = list.scrollHeight;
+    }
+
+    function tickElapsed() {
+      renderFooter();
+    }
+
+    function setMeta(partial) {
+      Object.assign(meta, partial);
+      renderFooter();
+    }
+
+    function showResults(summaryHtml, listItems) {
+      $('vc-results').hidden = false;
+      $('vc-summary').innerHTML = summaryHtml;
+      const list = $('vc-list');
+      list.innerHTML = '';
+      (listItems || []).forEach(item => {
+        const li = document.createElement('li');
+        li.className = item.className;
+        li.innerHTML = item.html;
+        list.appendChild(li);
+      });
+    }
+
+    async function complete({ summaryHtml, listItems }) {
+      running = false;
+      setProgress(totalSteps, 'Concluído — ficheiro gravado com sucesso');
+      $('vc-prog-pct').textContent = '100%';
+      $('vc-prog-bar-fill').style.width = '100%';
+      $('vc-prog-title').textContent = 'Concluído';
+      $('vc-prog-actions').hidden = false;
+      renderFooter();
+      await new Promise(r => setTimeout(r, 800));
+      close();
+      showResults(summaryHtml, listItems);
+      $('vc-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function fail(message) {
+      running = false;
+      const dialog = $('vc-modal-progress')?.querySelector('.vc-modal-progress');
+      if (dialog) dialog.classList.add('vc-prog-fail');
+      $('vc-prog-title').textContent = 'Erro';
+      $('vc-prog-phase').textContent = message;
+      $('vc-prog-step').textContent = `Interrompido no passo ${currentStep} de ${totalSteps}`;
+      $('vc-prog-actions').hidden = false;
+      renderFooter();
+    }
+
+    function close() {
+      running = false;
+      $('vc-modal-progress').hidden = true;
+      $('vc-prog-actions').hidden = true;
+      const dialog = $('vc-modal-progress')?.querySelector('.vc-modal-progress');
+      if (dialog) dialog.classList.remove('vc-prog-fail');
+    }
+
+    return {
+      open, setPhase, bump, setProgress, initItems, setItem, tickElapsed, setMeta, complete, fail, close,
+      get running() { return running; },
+    };
+  })();
+
+  $('vc-prog-close').addEventListener('click', () => {
+    if (!vcProgress.running) vcProgress.close();
+  });
+  $('vc-modal-progress').addEventListener('click', (e) => {
+    if (e.target === $('vc-modal-progress') && !vcProgress.running) vcProgress.close();
+  });
+
   async function summarizeConversation(content) {
     const trecho = content.slice(0, AI_INPUT_CHARS);
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -2334,59 +2865,106 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       ? 'Gerar consolidado (com IA · Sonnet)'
       : 'Gerar consolidado (1 .md, sem IA)';
     const busyLabel = useAI ? 'Gerando com IA…' : 'Gerando…';
+    const otherMergeId = useAI ? 'vc-btn-merge' : 'vc-btn-merge-ai';
+    const otherBtn = $(otherMergeId);
 
     btn.disabled = true;
     btn.textContent = busyLabel;
     btn.classList.add('processing');
-    const otherMergeId = useAI ? 'vc-btn-merge' : 'vc-btn-merge-ai';
-    const otherBtn = $(otherMergeId);
     if (otherBtn) otherBtn.disabled = true;
 
+    const mode = useAI ? 'merge-ai' : 'merge';
+    const n = entries.length;
+    const totalSteps = countMergeSteps(entries, useAI);
+    vcProgress.open({ mode, total: n, totalSteps });
+    vcProgress.initItems(entries.map((e, i) => ({ id: `m-${i}`, label: e.relPath })));
+    vcProgress.bump('A preparar leitura do vault e validação dos caminhos…');
+
     const convs = [];
-    for (const e of entries) {
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const itemId = `m-${i}`;
+      const base = mergeRelBase(e.relPath);
+      vcProgress.bump(`[${i + 1}/${n}] A abrir no vault: ${base}`);
+      vcProgress.setItem(itemId, { state: 'read', detail: 'a ler bytes do .md' });
       try {
         const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath);
         const content = await (await fileHandle.getFile()).text();
         let title = extractTitle(content, fileName);
         let resumo = '';
+        let tags = [];
         if (useAI && apiKey) {
+          const chars = Math.min(content.length, AI_INPUT_CHARS);
+          vcProgress.bump(`[${i + 1}/${n}] A pedir resumo e tags à API (${chars} caracteres → ${AI_MODEL})…`);
+          vcProgress.setItem(itemId, { state: 'ai', detail: `${chars} chars enviados` });
           try {
             const r = await summarizeConversation(content);
             if (r.titulo) title = r.titulo;
             resumo = (r.resumo || '').trim();
+            tags = Array.isArray(r.tags) ? r.tags.slice(0, 20) : [];
           } catch (err) {
             resumo = '';
           }
         }
-        convs.push({ fileName, title, date: fileDate(fileName), content, resumo });
+        convs.push({ fileName, title, date: fileDate(fileName), content, resumo, tags });
+        const tagHint = tags.length ? `${tags.length} tags` : 'sem tags';
+        vcProgress.bump(`[${i + 1}/${n}] Conversa registada: ${title || base}${useAI && resumo ? ` · ${tagHint}` : ''}`);
+        vcProgress.setItem(itemId, {
+          state: 'ok',
+          detail: useAI && !resumo ? 'sem resumo IA' : (title || fileName),
+        });
       } catch (err) {
-        convs.push({ fileName: e.relPath, title: e.relPath, date: '', content: '', resumo: '', erro: err.message });
+        convs.push({ fileName: e.relPath, title: e.relPath, date: '', content: '', resumo: '', tags: [], erro: err.message });
+        if (useAI && apiKey) {
+          vcProgress.bump(`[${i + 1}/${n}] Resumo IA ignorado (falha na leitura)`);
+        }
+        vcProgress.bump(`[${i + 1}/${n}] Erro: ${err.message}`);
+        vcProgress.setItem(itemId, { state: 'fail', detail: err.message });
       }
     }
+
+    vcProgress.bump(`A ordenar ${convs.length} conversas por data (cronológico)…`);
     convs.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+
+    vcProgress.bump('A montar secção 1 (índice) e secção 2 (transcrições)…');
 
     const pad = n => String(n).padStart(2, '0');
     const now = new Date();
     const human = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-    let capa = `# Consolidado — ${convs.length} conversas\n> Gerado em ${human} · fonte: vault ClaudeMsgm${useAI ? ' · resumos via Claude Sonnet' : ''}\n\n## Sumário\n`;
+    let capa =
+`# Consolidado de conversas — guia para IA
+
+> Gerado em ${human} · ${convs.length} conversas · fonte: vault ClaudeMsgm
+
+Esta seção 1 é apenas um índice explicativo, sem transcrições. Para cada conversa há número, data, um resumo de até 200 palavras e tags (nomes próprios, ferramentas, temas, áreas) para a IA localizar rapidamente a conversa certa antes de ler a transcrição.
+
+A seção 2 (TRANSCRIÇÕES) traz o conteúdo cru de cada conversa, identificado pelo mesmo [conv-NN], em ordem cronológica. Cada conversa pode ser percorrida em quatro partes — 1/4, 2/4, 3/4, 4/4 — usadas como guia para localizar tópicos ao longo do tempo.
+
+## Índice das conversas
+`;
     let corpo = `\n---\n# TRANSCRIÇÕES\n`;
     convs.forEach((c, i) => {
       const id = `conv-${pad(i + 1)}`;
-      const linhaResumo = c.resumo ? c.resumo : '_resumo pendente (Fase 2)_';
-      capa += `\n### [${id}] ${c.title}\n${linhaResumo}\n`;
+      const data = c.date || 's/ data';
+      const tagsLn = (c.tags && c.tags.length) ? c.tags.join(', ') : '—';
+      const resumo = c.resumo ? c.resumo : '_resumo pendente (gerar com IA)_';
+      capa += `\n### [${id}] ${c.title}\n**Data:** ${data} · **Tags:** ${tagsLn}\n\n${resumo}\n`;
       corpo += `\n## [${id}] ${c.title}\n\n${c.content}\n`;
     });
     const md = capa + '\n' + corpo;
 
     const outName = `consolidado_${pad(now.getDate())}${pad(now.getMonth() + 1)}${String(now.getFullYear() % 100)}-${pad(now.getHours())}${pad(now.getMinutes())}.md`;
+    vcProgress.bump(`A gravar ${outName} na pasta ${destHandle.name}…`);
+    vcProgress.setMeta({ output: outName });
+
     try {
       const outHandle = await destHandle.getFileHandle(outName, { create: true });
       const w = await outHandle.createWritable();
       await w.write(new Blob([md], { type: 'text/markdown' }));
       await w.close();
     } catch (err) {
-      alert('Erro ao gravar o consolidado: ' + err.message);
+      vcProgress.fail('Erro ao gravar o consolidado: ' + err.message);
       btn.disabled = false;
       btn.textContent = btnLabel;
       btn.classList.remove('processing');
@@ -2397,28 +2975,26 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
     const okN = convs.filter(c => !c.erro).length;
     const failN = convs.length - okN;
-    $('vc-results').hidden = false;
-    $('vc-summary').innerHTML =
+    const summaryHtml =
       `Consolidado: <strong>${okN}</strong> conversas` +
       (failN ? ` · <strong style="color:var(--accent);">${failN}</strong> com erro` : '') +
       (useAI ? ' · <strong>com IA</strong>' : '') +
       `<br>Arquivo: <code>${outName}</code> em <code>${destHandle.name}</code>`;
-    const list = $('vc-list');
-    list.innerHTML = '';
-    convs.forEach(c => {
-      const li = document.createElement('li');
-      li.className = c.erro ? 'fail' : 'ok';
+    const listItems = convs.map(c => {
       const resumoHint = useAI && !c.erro && !c.resumo ? ' · resumo indisponível' : '';
-      li.innerHTML = `<span class="vc-tag">${c.erro ? 'FAIL' : 'OK'}</span><span>${c.title}${c.erro ? ' — ' + c.erro : resumoHint}</span>`;
-      list.appendChild(li);
+      return {
+        className: c.erro ? 'fail' : 'ok',
+        html: `<span class="vc-tag">${c.erro ? 'FAIL' : 'OK'}</span><span>${c.title}${c.erro ? ' — ' + c.erro : resumoHint}</span>`,
+      };
     });
+
+    await vcProgress.complete({ summaryHtml, listItems });
 
     btn.disabled = false;
     btn.textContent = btnLabel;
     btn.classList.remove('processing');
     if (otherBtn) otherBtn.disabled = false;
     updateExecuteButton();
-    $('vc-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   $('vc-btn-merge').addEventListener('click', () => runMerge(false));
@@ -2433,8 +3009,21 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const copyEntries = entries.filter(e => e.status === 'ok');
     if (copyEntries.length === 0) return;
 
+    btnExecute.disabled = true;
+    btnExecute.textContent = 'Copiando…';
+    btnExecute.classList.add('processing');
+
     refreshSubfolderPreview();
     const subFolderName = buildSubfolderName();
+    const n = entries.length;
+    const totalSteps = countCopySteps(entries);
+
+    vcProgress.open({ mode: 'copy', total: n, totalSteps });
+    vcProgress.initItems(entries.map((e, i) => ({
+      id: `c-${i}`,
+      label: e.status === 'skip' ? e.sourceLine.trim() : e.relPath,
+    })));
+    vcProgress.bump(`A criar subpasta ${subFolderName} em ${destHandle.name}…`);
 
     let subDest;
     try {
@@ -2445,37 +3034,40 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         lastDestFullPath = joinWinPath(parentAbs, subFolderName);
         await idbSet('lastDestFullPath', lastDestFullPath);
       }
+      vcProgress.setMeta({ output: subFolderName });
     } catch (e) {
-      alert('Erro ao criar subpasta: ' + e.message);
+      vcProgress.fail('Erro ao criar subpasta: ' + e.message);
+      btnExecute.disabled = false;
+      btnExecute.textContent = 'Copiar arquivos';
+      btnExecute.classList.remove('processing');
+      updateExecuteButton();
       return;
     }
 
-    const list = $('vc-list');
-    list.innerHTML = '';
-    $('vc-results').hidden = false;
-    btnExecute.disabled = true;
-    btnExecute.textContent = 'Copiando…';
-    btnExecute.classList.add('processing');
-
     let ok = 0, fail = 0, skip = 0;
-    for (const entry of entries) {
-      const li = document.createElement('li');
-      const tag = document.createElement('span');
-      const text = document.createElement('span');
-      tag.className = 'vc-tag';
-      li.appendChild(tag);
-      li.appendChild(text);
+    const listItems = [];
+    let copyIdx = 0;
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const itemId = `c-${i}`;
+      const base = entry.status === 'skip' ? entry.sourceLine.trim() : mergeRelBase(entry.relPath);
 
       if (entry.status === 'skip') {
-        li.className = 'skip';
-        tag.textContent = 'SKIP';
-        text.textContent = `${entry.sourceLine.trim()} — ${entry.reason}`;
+        copyIdx++;
+        vcProgress.bump(`[${copyIdx}/${n}] Ignorado: ${entry.reason}`);
+        vcProgress.setItem(itemId, { state: 'skip', detail: entry.reason });
+        listItems.push({
+          className: 'skip',
+          html: `<span class="vc-tag">SKIP</span><span>${entry.sourceLine.trim()} — ${entry.reason}</span>`,
+        });
         skip++;
-        list.appendChild(li);
-        list.scrollTop = list.scrollHeight;
         continue;
       }
 
+      copyIdx++;
+      vcProgress.bump(`[${copyIdx}/${n}] A copiar ${base} para ${subFolderName}…`);
+      vcProgress.setItem(itemId, { state: 'copy', detail: 'a escrever bytes' });
       try {
         const { fileHandle, fileName } = await getFileFromPath(vaultHandle, entry.relPath);
         const file = await fileHandle.getFile();
@@ -2483,31 +3075,35 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         const writable = await newHandle.createWritable();
         await writable.write(file);
         await writable.close();
-        li.className = 'ok';
-        tag.textContent = 'OK';
-        text.textContent = fileName;
+        vcProgress.setItem(itemId, { state: 'ok', detail: `${fileName} copiado` });
+        listItems.push({
+          className: 'ok',
+          html: `<span class="vc-tag">OK</span><span>${fileName}</span>`,
+        });
         ok++;
       } catch (e) {
-        li.className = 'fail';
-        tag.textContent = 'FAIL';
-        text.textContent = `${entry.relPath} — ${e.message}`;
+        vcProgress.setItem(itemId, { state: 'fail', detail: e.message });
+        listItems.push({
+          className: 'fail',
+          html: `<span class="vc-tag">FAIL</span><span>${entry.relPath} — ${e.message}</span>`,
+        });
         fail++;
       }
-      list.appendChild(li);
-      list.scrollTop = list.scrollHeight;
     }
 
-    $('vc-summary').innerHTML = `
+    const summaryHtml = `
       Copiados: <strong>${ok}</strong> de <strong>${copyEntries.length}</strong>
       ${fail > 0 ? `· Falhas: <strong style="color: var(--accent);">${fail}</strong>` : ''}
       ${skip > 0 ? `· Ignorados: <strong style="color: var(--warn);">${skip}</strong>` : ''}<br>
       Pasta: <code>${subFolderName}</code> dentro de <code>${destHandle.name}</code>
     `;
 
+    await vcProgress.complete({ summaryHtml, listItems });
+
     btnExecute.disabled = false;
     btnExecute.textContent = 'Copiar arquivos';
     btnExecute.classList.remove('processing');
-    $('vc-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    updateExecuteButton();
   });
 
   // ---- Open dest (protocolo Windows; fallback helper local)
@@ -2537,7 +3133,12 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   // ---- Reset
   $('vc-btn-reset').addEventListener('click', async () => {
     if (!confirm('Apagar pastas salvas (vault e destino)? A próxima abertura vai pedir pra selecionar de novo.')) return;
-    await idbClear();
+    try {
+      await idbDelete('vault');
+      await idbDelete('dest');
+      await idbDelete('destAbsPath');
+      await idbDelete('lastDestFullPath');
+    } catch { /* ignore */ }
     vaultHandle = null; destHandle = null;
     lastDestSubfolder = null;
     lastDestFullPath = null;
@@ -2584,6 +3185,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       try {
         const savedPrompt = await idbGet('mergePrompt');
         if (savedPrompt) mergePrompt = savedPrompt;
+      } catch { /* ignore */ }
+      await loadSavedPromptsFromIdb();
+      try {
+        const savedKey = await idbGet('apiKey');
+        if (savedKey) apiKey = savedKey;
       } catch { /* ignore */ }
       refreshSubfolderPreview();
       updatePasteStatus();
