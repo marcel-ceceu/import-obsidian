@@ -1010,7 +1010,7 @@ footer {
   <!-- ============ HEADER ============ -->
   <header>
     <div class="brand-row">
-      <span class="brand-mark">CV · v5.0 MVP</span>
+      <span class="brand-mark">CV · v1.5</span>
       <div class="brand-meta">
         Pipeline Claude.ai → Obsidian<br>
         <b>PC Casa</b> · vault ClaudeMsgm
@@ -1204,6 +1204,9 @@ footer {
     <div class="vc-intro">
       <h2>Vault <em>Copy</em></h2>
       <p>Pesquise no Obsidian, cole os resultados aqui, copie em massa pra outra pasta. Aceita Copy search results, caminhos do Explorer, wiki-links e paths relativos.</p>
+      <div class="vc-row" style="margin-top:16px;">
+        <button class="btn btn-ghost" id="vc-btn-config" type="button">Configurações do Merge</button>
+      </div>
     </div>
 
     <!-- Browser support warning (preenchido via JS se faltar suporte) -->
@@ -1259,6 +1262,10 @@ footer {
       <button class="vc-execute" id="vc-btn-execute" type="button" disabled>Copiar arquivos</button>
     </div>
 
+    <div class="vc-execute-wrap" style="margin-top:12px;">
+      <button class="vc-execute" id="vc-btn-merge" type="button" disabled>Gerar consolidado (1 .md, sem IA)</button>
+    </div>
+
     <!-- Results -->
     <section class="vc-results" id="vc-results" hidden>
       <h3>Resultado</h3>
@@ -1280,6 +1287,25 @@ footer {
         <div class="vc-row" style="margin-top: 0;">
           <button class="btn btn-ghost" id="vc-modal-open-copy" type="button">Copiar caminho</button>
           <button class="btn btn-ghost" id="vc-modal-open-close" type="button">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="vc-modal-backdrop" id="vc-modal-config" hidden>
+      <div class="vc-modal" role="dialog" aria-labelledby="vc-cfg-title">
+        <h4 id="vc-cfg-title">Configurações do Merge</h4>
+        <p>Modelo de resumo: <strong>Claude Sonnet</strong> (string definida na Fase 2).</p>
+
+        <label class="vc-label" for="vc-cfg-prompt">Prompt de resumo (editável)</label>
+        <textarea class="vc-textarea" id="vc-cfg-prompt" style="min-height:200px;"></textarea>
+
+        <label class="vc-label" for="vc-cfg-key">Chave da API (só nesta sessão, não é salva)</label>
+        <input type="password" class="vc-input" id="vc-cfg-key" autocomplete="off" spellcheck="false" placeholder="sk-ant-...">
+        <p class="vc-hint">A chave fica apenas em memória — não é gravada em disco nem commitada.</p>
+
+        <div class="vc-row" style="margin-top:16px;">
+          <button class="btn" id="vc-cfg-save" type="button">Salvar</button>
+          <button class="btn btn-ghost" id="vc-cfg-close" type="button">Fechar</button>
         </div>
       </div>
     </div>
@@ -1800,6 +1826,18 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   let lastDestSubfolder = null;
   let lastDestFullPath = null;
 
+  const DEFAULT_PROMPT = [
+    'Você recebe a transcrição de uma conversa entre um usuário e a IA.',
+    'Escreva um resumo objetivo em português, no máximo 500 palavras, cobrindo:',
+    'o problema tratado, as decisões tomadas (priorize a decisão FINAL, não as',
+    'cogitadas no meio), e os termos/entidades técnicas relevantes.',
+    'Não invente nada que não esteja na conversa.',
+    'Responda APENAS em JSON: {"titulo":"...","resumo":"..."} sem texto extra.',
+  ].join('\n');
+
+  let apiKey = '';
+  let mergePrompt = DEFAULT_PROMPT;
+
   function buildSubfolderName(date) {
     const d = date || new Date();
     const pad = n => String(n).padStart(2, '0');
@@ -1924,6 +1962,32 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     } catch {
       $('vc-modal-open-msg').textContent = 'Selecione o caminho abaixo e copie manualmente (Ctrl+C).';
     }
+  });
+
+  async function openConfigModal() {
+    try {
+      const saved = await idbGet('mergePrompt');
+      if (saved) mergePrompt = saved;
+    } catch { /* ignore */ }
+    $('vc-cfg-prompt').value = mergePrompt;
+    $('vc-cfg-key').value = apiKey;
+    $('vc-modal-config').hidden = false;
+  }
+
+  function closeConfigModal() {
+    $('vc-modal-config').hidden = true;
+  }
+
+  $('vc-btn-config').addEventListener('click', openConfigModal);
+  $('vc-cfg-close').addEventListener('click', closeConfigModal);
+  $('vc-modal-config').addEventListener('click', (e) => {
+    if (e.target === $('vc-modal-config')) closeConfigModal();
+  });
+  $('vc-cfg-save').addEventListener('click', async () => {
+    mergePrompt = $('vc-cfg-prompt').value.trim() || DEFAULT_PROMPT;
+    apiKey = $('vc-cfg-key').value.trim();
+    try { await idbSet('mergePrompt', mergePrompt); } catch { /* ignore */ }
+    closeConfigModal();
   });
 
   async function updateOpenHint() {
@@ -2100,7 +2164,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   function updateExecuteButton() {
     const entries = getPasteEntries();
     const okCount = entries.filter(e => e.status === 'ok').length;
-    btnExecute.disabled = !(vaultHandle && destHandle && okCount > 0);
+    const ready = !!(vaultHandle && destHandle && okCount > 0);
+    btnExecute.disabled = !ready;
+    const m = $('vc-btn-merge');
+    if (m) m.disabled = !ready;
   }
 
   function updatePasteStatus() {
@@ -2155,6 +2222,114 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     pasteArea.value = '';
     pasteArea.dispatchEvent(new Event('input'));
   });
+
+  function extractTitle(content, fileName) {
+    let title = '';
+    if (content.indexOf('---') === 0) {
+      const end = content.indexOf('\n---', 3);
+      if (end > 0) {
+        const m = content.slice(0, end).match(/^title:\s*["']?(.+?)["']?\s*$/m);
+        if (m) title = m[1].trim();
+      }
+    }
+    if (!title) {
+      const h1 = content.match(/^#\s+(.+)$/m);
+      if (h1) title = h1[1].trim();
+    }
+    if (!title) {
+      title = fileName.replace(/\.md$/i, '')
+        .replace(/^\d{4}-\d{2}-\d{2}[-_ ]*/, '')
+        .replace(/[-_]+/g, ' ')
+        .trim();
+    }
+    return title || fileName;
+  }
+
+  function fileDate(fileName) {
+    const m = fileName.match(/(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+  }
+
+  async function runMerge() {
+    if (!(await ensurePermission(vaultHandle, 'read'))) {
+      alert('Permissão de leitura negada para o vault.');
+      return;
+    }
+    if (!(await ensurePermission(destHandle, 'readwrite'))) {
+      alert('Permissão de escrita negada para o destino.');
+      return;
+    }
+
+    const entries = getPasteEntries().filter(e => e.status === 'ok');
+    if (!entries.length) return;
+
+    const btn = $('vc-btn-merge');
+    btn.disabled = true;
+    btn.textContent = 'Gerando…';
+    btn.classList.add('processing');
+
+    const convs = [];
+    for (const e of entries) {
+      try {
+        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath);
+        const content = await (await fileHandle.getFile()).text();
+        convs.push({ fileName, title: extractTitle(content, fileName), date: fileDate(fileName), content });
+      } catch (err) {
+        convs.push({ fileName: e.relPath, title: e.relPath, date: '', content: '', erro: err.message });
+      }
+    }
+    convs.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+
+    const pad = n => String(n).padStart(2, '0');
+    const now = new Date();
+    const human = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    let capa = `# Consolidado — ${convs.length} conversas\n> Gerado em ${human} · fonte: vault ClaudeMsgm\n\n## Sumário\n`;
+    let corpo = `\n---\n# TRANSCRIÇÕES\n`;
+    convs.forEach((c, i) => {
+      const id = `conv-${pad(i + 1)}`;
+      capa += `\n### [${id}] ${c.title}\n_resumo pendente (Fase 2)_\n`;
+      corpo += `\n## [${id}] ${c.title}\n\n${c.content}\n`;
+    });
+    const md = capa + '\n' + corpo;
+
+    const outName = `consolidado_${pad(now.getDate())}${pad(now.getMonth() + 1)}${String(now.getFullYear() % 100)}-${pad(now.getHours())}${pad(now.getMinutes())}.md`;
+    try {
+      const outHandle = await destHandle.getFileHandle(outName, { create: true });
+      const w = await outHandle.createWritable();
+      await w.write(new Blob([md], { type: 'text/markdown' }));
+      await w.close();
+    } catch (err) {
+      alert('Erro ao gravar o consolidado: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = 'Gerar consolidado (1 .md, sem IA)';
+      btn.classList.remove('processing');
+      return;
+    }
+
+    const okN = convs.filter(c => !c.erro).length;
+    const failN = convs.length - okN;
+    $('vc-results').hidden = false;
+    $('vc-summary').innerHTML =
+      `Consolidado: <strong>${okN}</strong> conversas` +
+      (failN ? ` · <strong style="color:var(--accent);">${failN}</strong> com erro` : '') +
+      `<br>Arquivo: <code>${outName}</code> em <code>${destHandle.name}</code>`;
+    const list = $('vc-list');
+    list.innerHTML = '';
+    convs.forEach(c => {
+      const li = document.createElement('li');
+      li.className = c.erro ? 'fail' : 'ok';
+      li.innerHTML = `<span class="vc-tag">${c.erro ? 'FAIL' : 'OK'}</span><span>${c.title}${c.erro ? ' — ' + c.erro : ''}</span>`;
+      list.appendChild(li);
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Gerar consolidado (1 .md, sem IA)';
+    btn.classList.remove('processing');
+    $('vc-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  $('vc-btn-merge').addEventListener('click', runMerge);
 
   // ---- Execute
   btnExecute.addEventListener('click', async () => {
@@ -2317,6 +2492,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       else applyVcDefaults();
       const savedFull = await idbGet('lastDestFullPath');
       if (savedFull) lastDestFullPath = savedFull;
+      try {
+        const savedPrompt = await idbGet('mergePrompt');
+        if (savedPrompt) mergePrompt = savedPrompt;
+      } catch { /* ignore */ }
       refreshSubfolderPreview();
       updatePasteStatus();
       updateOpenHint();
