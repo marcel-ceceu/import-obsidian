@@ -1379,6 +1379,10 @@ footer {
       <button class="vc-execute" id="vc-btn-execute" type="button" disabled>Copiar arquivos</button>
     </div>
 
+    <div class="vc-execute-wrap" style="margin-top:12px;">
+      <button class="vc-execute" id="vc-btn-llms" type="button" disabled>Copiar + gerar llms.txt</button>
+    </div>
+
     <!-- Results -->
     <section class="vc-results" id="vc-results" hidden>
       <h3>Resultado</h3>
@@ -2607,7 +2611,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const okCount = entries.filter(e => e.status === 'ok').length;
     const ready = okCount > 0;
     btnExecute.disabled = !ready;
-    ['vc-btn-merge', 'vc-btn-merge-ai'].forEach(id => {
+    ['vc-btn-merge', 'vc-btn-merge-ai', 'vc-btn-llms'].forEach(id => {
       const b = $(id);
       if (b) b.disabled = !ready;
     });
@@ -2729,6 +2733,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     return 1 + entries.length;
   }
 
+  function countLlmsSteps(entries) {
+    return 1 + entries.length * 3 + 1;
+  }
+
   const vcProgress = (() => {
     let running = false;
     let startedAt = 0;
@@ -2742,6 +2750,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       copy: 'A copiar arquivos…',
       merge: 'A gerar consolidado (sem IA)…',
       'merge-ai': 'A gerar consolidado (com IA)…',
+      llms: 'A copiar e gerar llms.txt…',
     };
 
     const STATE_TAG = {
@@ -2761,13 +2770,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     function renderFooter() {
       const footer = $('vc-prog-footer');
       if (!footer) return;
-      const modeLabels = { copy: 'Cópia', merge: 'Consolidado sem IA', 'merge-ai': 'Consolidado com IA' };
+      const modeLabels = { copy: 'Cópia', merge: 'Consolidado sem IA', 'merge-ai': 'Consolidado com IA', llms: 'Copiar + llms.txt' };
       const lines = [`Modo: ${modeLabels[meta.mode] || meta.mode || '—'}`];
       if (meta.vaultName) lines.push(`Vault: ${meta.vaultName}`);
       if (meta.destName) lines.push(`Destino: ${meta.destName}`);
       if (meta.destAbs) lines.push(`Caminho: ${meta.destAbs}`);
       if (meta.output) lines.push(`Output: ${meta.output}`);
-      if (meta.mode === 'merge-ai') lines.push(`Modelo: ${aiModel}`);
+      if (meta.mode === 'merge-ai' || meta.mode === 'llms') lines.push(`Modelo: ${aiModel}`);
       if (startedAt) lines.push(`Tempo: ${formatElapsed(Date.now() - startedAt)}`);
       footer.textContent = lines.join(' · ');
     }
@@ -3145,6 +3154,184 @@ A seção 2 (TRANSCRIÇÕES) traz o conteúdo cru de cada conversa, identificado
 
   $('vc-btn-merge').addEventListener('click', () => runMerge(false));
   $('vc-btn-merge-ai').addEventListener('click', () => runMerge(true));
+
+  async function runLlms() {
+    if (!apiKey) {
+      alert('Configure a chave em "Configurações do Merge".');
+      return;
+    }
+    if (!(await pickVaultIfNeeded())) return;
+    if (!(await pickDestIfNeeded())) return;
+
+    const entries = getPasteEntries()
+      .filter(e => e.status === 'ok')
+      .slice()
+      .sort((a, b) =>
+        (fileDate(mergeRelBase(a.relPath)) || '9999')
+          .localeCompare(fileDate(mergeRelBase(b.relPath)) || '9999')
+      );
+    if (!entries.length) return;
+
+    const btn = $('vc-btn-llms');
+    const btnLabel = 'Copiar + gerar llms.txt';
+    const busyLabel = 'Copiando + resumindo…';
+    const siblingIds = ['vc-btn-merge', 'vc-btn-merge-ai'];
+
+    btn.disabled = true;
+    btn.textContent = busyLabel;
+    btn.classList.add('processing');
+    siblingIds.forEach(id => { const b = $(id); if (b) b.disabled = true; });
+
+    refreshSubfolderPreview();
+    const subFolderName = buildSubfolderName();
+    const n = entries.length;
+    const totalSteps = countLlmsSteps(entries);
+
+    vcProgress.open({ mode: 'llms', total: n, totalSteps });
+    vcProgress.initItems(entries.map((e, i) => ({ id: `l-${i}`, label: e.relPath })));
+    vcProgress.bump(`A criar subpasta ${subFolderName} em ${destHandle.name}…`);
+
+    let subDest;
+    try {
+      subDest = await destHandle.getDirectoryHandle(subFolderName, { create: true });
+      lastDestSubfolder = subFolderName;
+      const parentAbs = getDestAbsParent();
+      if (parentAbs) {
+        lastDestFullPath = joinWinPath(parentAbs, subFolderName);
+        await idbSet('lastDestFullPath', lastDestFullPath);
+      }
+      vcProgress.setMeta({ output: subFolderName });
+    } catch (e) {
+      vcProgress.fail('Erro ao criar subpasta: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = btnLabel;
+      btn.classList.remove('processing');
+      siblingIds.forEach(id => { const b = $(id); if (b) b.disabled = false; });
+      updateExecuteButton();
+      return;
+    }
+
+    const indexRows = [];
+    const listItems = [];
+    let okN = 0;
+    let failN = 0;
+    let warnN = 0;
+
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const itemId = `l-${i}`;
+      const base = mergeRelBase(e.relPath);
+      vcProgress.bump(`[${i + 1}/${n}] copiando + resumindo… ${base}`);
+      vcProgress.setItem(itemId, { state: 'copy', detail: 'a copiar .md' });
+
+      try {
+        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath);
+        const file = await fileHandle.getFile();
+
+        const newHandle = await subDest.getFileHandle(fileName, { create: true });
+        const writable = await newHandle.createWritable();
+        await writable.write(file);
+        await writable.close();
+
+        const cleaned = cleanExportMarkdown(await file.text());
+        let title = extractTitle(cleaned, fileName);
+        let resumo = '';
+        let tags = [];
+        let jsonFailed = false;
+
+        vcProgress.setItem(itemId, { state: 'ai', detail: 'a pedir resumo à API' });
+        vcProgress.bump(`[${i + 1}/${n}] resumo IA (${Math.min(cleaned.length, AI_INPUT_CHARS)} chars)…`);
+        try {
+          const r = await summarizeConversation(cleaned);
+          if (r.jsonOk) {
+            if (r.titulo) title = r.titulo;
+            resumo = (r.resumo || '').replace(/\s+/g, ' ').trim();
+            tags = Array.isArray(r.tags) ? r.tags.slice(0, 20) : [];
+          } else {
+            jsonFailed = true;
+            title = extractTitle(cleaned, fileName);
+          }
+        } catch {
+          jsonFailed = true;
+        }
+
+        const date = fileDate(fileName) || 's/ data';
+        indexRows.push({ fileName, title, date, resumo, tags });
+
+        const resumoHint = jsonFailed
+          ? ' · resumo IA falhou — JSON inválido'
+          : (!resumo ? ' · sem resumo IA' : '');
+        if (jsonFailed) warnN++;
+
+        vcProgress.setItem(itemId, { state: 'ok', detail: `${fileName} copiado` });
+        listItems.push({
+          className: 'ok',
+          html: `<span class="vc-tag">OK</span><span>${title}${resumoHint}</span>`,
+        });
+        okN++;
+      } catch (err) {
+        failN++;
+        vcProgress.setItem(itemId, { state: 'fail', detail: err.message });
+        listItems.push({
+          className: 'fail',
+          html: `<span class="vc-tag">FAIL</span><span>${e.relPath} — ${err.message}</span>`,
+        });
+      }
+    }
+
+    function formatLlmsLine(row) {
+      const resumo = (row.resumo || '').replace(/\s+/g, ' ').trim();
+      let line = `- [${row.date} · ${row.title}](${row.fileName})`;
+      if (resumo) {
+        line += `: ${resumo}.`;
+        if (row.tags && row.tags.length) line += ` Tags: ${row.tags.join(', ')}.`;
+      } else if (row.tags && row.tags.length) {
+        line += `: Tags: ${row.tags.join(', ')}.`;
+      }
+      return line;
+    }
+
+    const llmsBody =
+      `# Índice de conversas — ${indexRows.length} itens\n\n` +
+      `> Leia este arquivo primeiro. Cada item tem data, resumo e tags; use-os para\n` +
+      `> escolher a conversa certa e abrir o .md correspondente nesta mesma pasta.\n` +
+      `> As transcrições estão íntegras nos arquivos .md ao lado, sem edição.\n\n` +
+      `## Conversas\n` +
+      indexRows.map(formatLlmsLine).join('\n') + '\n';
+
+    vcProgress.bump('A gravar llms.txt na subpasta…');
+    try {
+      const outHandle = await subDest.getFileHandle('llms.txt', { create: true });
+      const w = await outHandle.createWritable();
+      await w.write(new Blob([llmsBody], { type: 'text/plain;charset=utf-8' }));
+      await w.close();
+      await markLastDestResultadosGeralRoot();
+    } catch (err) {
+      vcProgress.fail('Erro ao gravar llms.txt: ' + err.message);
+      btn.disabled = false;
+      btn.textContent = btnLabel;
+      btn.classList.remove('processing');
+      siblingIds.forEach(id => { const b = $(id); if (b) b.disabled = false; });
+      updateExecuteButton();
+      return;
+    }
+
+    const summaryHtml =
+      `Copiados: <strong>${okN}</strong> · llms.txt com <strong>${indexRows.length}</strong> entradas` +
+      (failN ? ` · Falhas: <strong style="color:var(--accent);">${failN}</strong>` : '') +
+      (warnN ? ` · Avisos IA: <strong style="color:var(--warn);">${warnN}</strong>` : '') +
+      `<br>Pasta: <code>${subFolderName}</code> · índice: <code>llms.txt</code>`;
+
+    await vcProgress.complete({ summaryHtml, listItems });
+
+    btn.disabled = false;
+    btn.textContent = btnLabel;
+    btn.classList.remove('processing');
+    siblingIds.forEach(id => { const b = $(id); if (b) b.disabled = false; });
+    updateExecuteButton();
+  }
+
+  $('vc-btn-llms').addEventListener('click', runLlms);
 
   // ---- Execute
   btnExecute.addEventListener('click', async () => {
