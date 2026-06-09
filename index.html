@@ -2062,7 +2062,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
   async function countMdInDir(dirHandle, limit) {
     let n = 0;
-    for await (const [name, handle] of dirHandle.values()) {
+    for await (const [name, handle] of dirHandle.entries()) {
       if (handle.kind === 'file' && /\.md$/i.test(name)) {
         n++;
         if (limit && n >= limit) return n;
@@ -2075,7 +2075,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (!rootHandle) return { contentSubdir: 'conversations', rootHasMd: false };
     let rootHasMd = false;
     const subdirs = [];
-    for await (const [name, handle] of rootHandle.values()) {
+    for await (const [name, handle] of rootHandle.entries()) {
       if (handle.kind === 'file' && /\.md$/i.test(name)) rootHasMd = true;
       if (handle.kind === 'directory') subdirs.push({ name, handle });
     }
