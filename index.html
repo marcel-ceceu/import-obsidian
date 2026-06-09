@@ -1333,9 +1333,10 @@ footer {
         <h3>Pasta do Vault</h3>
         <span class="vc-status" id="vc-status-vault">pendente</span>
       </div>
-      <button class="btn btn-ghost" id="vc-btn-vault" type="button">Selecionar vault ClaudeMsgm (fonte)</button>
+      <button class="btn btn-ghost" id="vc-btn-vault" type="button">Selecionar pasta do vault (fonte)</button>
       <div class="vc-path empty" id="vc-path-vault">padrão: C:\Users\Windows\Documents\ClaudeMsgm</div>
-      <p class="vc-hint">Fonte oficial: <code>C:\Users\Windows\Documents\ClaudeMsgm</code> — autorize esta pasta no picker.</p>
+      <p class="vc-hint" id="vc-vault-layout-hint" hidden></p>
+      <p class="vc-hint">Padrão: <code>C:\Users\Windows\Documents\ClaudeMsgm</code> — pode escolher outro vault; autorize a pasta no picker.</p>
     </section>
 
     <!-- Step 2: Paste -->
@@ -2001,6 +2002,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
   // ---- State
   let vaultHandle = null;
+  let vaultLayout = null;
   let destHandle = null;
   let lastDestSubfolder = null;
   let lastDestFullPath = null;
@@ -2058,15 +2060,85 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
   }
 
+  async function countMdInDir(dirHandle, limit) {
+    let n = 0;
+    for await (const [name, handle] of dirHandle.values()) {
+      if (handle.kind === 'file' && /\.md$/i.test(name)) {
+        n++;
+        if (limit && n >= limit) return n;
+      }
+    }
+    return n;
+  }
+
+  async function detectVaultLayout(rootHandle) {
+    if (!rootHandle) return { contentSubdir: 'conversations', rootHasMd: false };
+    let rootHasMd = false;
+    const subdirs = [];
+    for await (const [name, handle] of rootHandle.values()) {
+      if (handle.kind === 'file' && /\.md$/i.test(name)) rootHasMd = true;
+      if (handle.kind === 'directory') subdirs.push({ name, handle });
+    }
+    const conv = subdirs.find(d => d.name.localeCompare('conversations', undefined, { sensitivity: 'accent' }) === 0);
+    if (conv) return { contentSubdir: conv.name, rootHasMd };
+
+    let best = null;
+    for (const d of subdirs) {
+      const mdCount = await countMdInDir(d.handle, 1);
+      if (mdCount > 0) {
+        const fullCount = await countMdInDir(d.handle, 0);
+        if (!best || fullCount > best.mdCount) best = { name: d.name, mdCount: fullCount };
+      }
+    }
+    if (best) return { contentSubdir: best.name, rootHasMd };
+    return { contentSubdir: null, rootHasMd };
+  }
+
+  function updateVaultLayoutHint() {
+    const el = $('vc-vault-layout-hint');
+    if (!el) return;
+    if (!vaultHandle || !vaultLayout) {
+      el.hidden = true;
+      el.textContent = '';
+      return;
+    }
+    let msg = 'Estrutura detectada: ';
+    if (vaultLayout.contentSubdir) {
+      msg += `subpasta <code>${vaultLayout.contentSubdir}/</code>`;
+      if (vaultLayout.rootHasMd) msg += ' (há .md também na raiz)';
+    } else if (vaultLayout.rootHasMd) {
+      msg += '.md na raiz do vault';
+    } else {
+      msg += 'não encontrou .md — confira se a pasta certa foi autorizada';
+    }
+    el.innerHTML = msg;
+    el.hidden = false;
+  }
+
+  async function applyVaultSelection(handle) {
+    vaultHandle = handle;
+    await idbSet('vault', vaultHandle);
+    vaultLayout = await detectVaultLayout(vaultHandle);
+    await idbSet('vaultLayout', { name: vaultHandle.name, ...vaultLayout });
+    $('vc-path-vault').textContent = vaultHandle.name;
+    $('vc-path-vault').classList.remove('empty');
+    setStatus('vc-status-vault', '✓ ok', 'ok');
+    updateVaultLayoutHint();
+    updatePasteStatus();
+  }
+
   async function pickVaultIfNeeded() {
-    if (vaultHandle && (await ensurePermission(vaultHandle, 'read'))) return true;
+    if (vaultHandle && (await ensurePermission(vaultHandle, 'read'))) {
+      if (!vaultLayout) {
+        vaultLayout = await detectVaultLayout(vaultHandle);
+        await idbSet('vaultLayout', { name: vaultHandle.name, ...vaultLayout });
+        updateVaultLayoutHint();
+        updatePasteStatus();
+      }
+      return true;
+    }
     try {
-      vaultHandle = await window.showDirectoryPicker({ id: 'vault-picker', mode: 'read' });
-      await idbSet('vault', vaultHandle);
-      $('vc-path-vault').textContent = vaultHandle.name;
-      $('vc-path-vault').classList.remove('empty');
-      setStatus('vc-status-vault', '✓ ok', 'ok');
-      updatePasteStatus();
+      await applyVaultSelection(await window.showDirectoryPicker({ id: 'vault-picker', mode: 'read' }));
       return true;
     } catch (e) {
       if (e.name !== 'AbortError') alert('Erro ao selecionar vault: ' + e.message);
@@ -2470,7 +2542,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     return String(s).replace(/\\/g, '/');
   }
 
-  function normalizeToVaultRelPath(raw, vaultName) {
+  function normalizeToVaultRelPath(raw, vaultName, layout) {
     let p = normalizeSlashes(raw.trim());
     if (!/^[A-Za-z]:/.test(p)) {
       return p.replace(/^\/+/, '');
@@ -2489,15 +2561,60 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     }
     if (/^[A-Za-z]:/.test(p)) {
       const convIdx = p.toLowerCase().indexOf('/conversations/');
-      if (convIdx >= 0) p = p.slice(convIdx + 1);
+      if (convIdx >= 0) {
+        p = p.slice(convIdx + 1);
+      } else if (layout?.contentSubdir) {
+        const subToken = '/' + layout.contentSubdir.toLowerCase() + '/';
+        const subIdx = p.toLowerCase().indexOf(subToken);
+        if (subIdx >= 0) p = p.slice(subIdx + 1);
+        else {
+          const parts = p.split('/').filter(Boolean);
+          const mdFile = parts.find(x => /\.md$/i.test(x));
+          if (mdFile) p = mdFile;
+        }
+      } else {
+        const parts = p.split('/').filter(Boolean);
+        const mdFile = parts.find(x => /\.md$/i.test(x));
+        if (mdFile) p = mdFile;
+      }
     }
-    return p.replace(/^\/+/, '');
+    p = p.replace(/^\/+/, '');
+    if (layout?.contentSubdir && layout.contentSubdir !== 'conversations') {
+      if (p.toLowerCase().startsWith('conversations/')) {
+        p = p.slice('conversations/'.length);
+      }
+    }
+    return p;
   }
 
-  function ensureConversationsPrefix(relPath) {
+  function ensureContentPrefix(relPath, layout) {
     const normalized = normalizeSlashes(relPath).replace(/^\/+/, '');
-    if (!normalized.includes('/')) return `conversations/${normalized}`;
+    if (normalized.includes('/')) return normalized;
+    const sub = layout?.contentSubdir;
+    if (sub) return `${sub}/${normalized}`;
     return normalized;
+  }
+
+  function buildPathAttempts(relPath, layout) {
+    const normalized = normalizeSlashes(relPath).replace(/^\/+/, '');
+    const attempts = [normalized];
+    const base = normalized.split('/').pop();
+    const sub = layout?.contentSubdir;
+
+    if (normalized.toLowerCase().startsWith('conversations/')) {
+      const without = normalized.slice('conversations/'.length);
+      attempts.push(without);
+      if (sub && sub.toLowerCase() !== 'conversations') attempts.push(`${sub}/${without}`);
+    }
+    if (sub) {
+      if (!normalized.toLowerCase().startsWith(sub.toLowerCase() + '/')) {
+        attempts.push(`${sub}/${normalized}`);
+        if (!normalized.includes('/')) attempts.push(`${sub}/${base}`);
+      }
+    }
+    if (normalized.includes('/')) attempts.push(base);
+    if (sub && normalized === base) attempts.push(`${sub}/${base}`);
+    return [...new Set(attempts.filter(Boolean))];
   }
 
   function isValidRelPath(relPath) {
@@ -2514,7 +2631,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     return true;
   }
 
-  function parsePasteLine(line, vaultName) {
+  function parsePasteLine(line, vaultName, layout) {
     const sourceLine = line;
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('//')) {
@@ -2539,15 +2656,16 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       pathCandidate = wikiMatch[1].trim();
       format = 'wikilink';
       if (!/\.md$/i.test(pathCandidate)) pathCandidate += '.md';
-      pathCandidate = ensureConversationsPrefix(pathCandidate);
+      pathCandidate = ensureContentPrefix(pathCandidate, layout);
     } else if (/^[A-Za-z]:[/\\]/.test(text)) {
       format = 'absolute';
-      pathCandidate = normalizeToVaultRelPath(text, vaultName);
+      pathCandidate = normalizeToVaultRelPath(text, vaultName, layout);
+      pathCandidate = ensureContentPrefix(pathCandidate, layout);
     } else {
       pathCandidate = normalizeSlashes(text).replace(/^\/+/, '');
       if (!pathCandidate.includes('/')) {
         format = 'basename';
-        pathCandidate = ensureConversationsPrefix(pathCandidate);
+        pathCandidate = ensureContentPrefix(pathCandidate, layout);
       }
     }
 
@@ -2565,18 +2683,18 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     return { sourceLine, relPath: pathCandidate, format, status: 'ok' };
   }
 
-  function parsePasteLines(text, vaultName) {
+  function parsePasteLines(text, vaultName, layout) {
     return text.split(/\r?\n/)
       .filter(line => line.trim().length > 0)
-      .map(line => parsePasteLine(line, vaultName));
+      .map(line => parsePasteLine(line, vaultName, layout));
   }
 
   function getPasteEntries() {
-    return parsePasteLines(pasteArea.value, vaultHandle?.name || null);
+    return parsePasteLines(pasteArea.value, vaultHandle?.name || null, vaultLayout);
   }
 
   // ---- Navega no vault até o arquivo
-  async function getFileFromPath(rootHandle, relPath) {
+  async function getFileFromPathOnce(rootHandle, relPath) {
     const normalized = relPath.replace(/\\/g, '/').replace(/^\/+/, '');
     const parts = normalized.split('/').filter(p => p.length > 0);
     if (parts.length === 0) throw new Error('caminho vazio');
@@ -2594,6 +2712,23 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       }
     }
     return { fileHandle: await dir.getFileHandle(fileName), fileName };
+  }
+
+  async function getFileFromPath(rootHandle, relPath, layout) {
+    const attempts = buildPathAttempts(relPath, layout);
+    let lastErr;
+    for (const attempt of attempts) {
+      try {
+        return await getFileFromPathOnce(rootHandle, attempt);
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    const tried = attempts.join(', ');
+    const hint = layout?.contentSubdir
+      ? ` — tentou: ${tried}; subpasta detectada: ${layout.contentSubdir}/`
+      : ` — tentou: ${tried}`;
+    throw new Error((lastErr?.message || String(lastErr)) + hint);
   }
 
   // ---- UI: status
@@ -2636,12 +2771,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   // ---- Vault selection
   $('vc-btn-vault').addEventListener('click', async () => {
     try {
-      vaultHandle = await window.showDirectoryPicker({ id: 'vault-picker', mode: 'read' });
-      await idbSet('vault', vaultHandle);
-      $('vc-path-vault').textContent = vaultHandle.name;
-      $('vc-path-vault').classList.remove('empty');
-      setStatus('vc-status-vault', '✓ ok', 'ok');
-      updatePasteStatus();
+      await applyVaultSelection(await window.showDirectoryPicker({ id: 'vault-picker', mode: 'read' }));
     } catch (e) {
       if (e.name !== 'AbortError') alert('Erro ao selecionar vault: ' + e.message);
     }
@@ -3032,7 +3162,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       vcProgress.bump(`[${i + 1}/${n}] A abrir no vault: ${base}`);
       vcProgress.setItem(itemId, { state: 'read', detail: 'a ler bytes do .md' });
       try {
-        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath);
+        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath, vaultLayout);
         let content = await (await fileHandle.getFile()).text();
         content = cleanExportMarkdown(content);
         let title = extractTitle(content, fileName);
@@ -3225,7 +3355,7 @@ A seção 2 (TRANSCRIÇÕES) traz o conteúdo cru de cada conversa, identificado
       vcProgress.setItem(itemId, { state: 'copy', detail: 'a copiar .md' });
 
       try {
-        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath);
+        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, e.relPath, vaultLayout);
         const file = await fileHandle.getFile();
 
         const newHandle = await subDest.getFileHandle(fileName, { create: true });
@@ -3402,7 +3532,7 @@ A seção 2 (TRANSCRIÇÕES) traz o conteúdo cru de cada conversa, identificado
       vcProgress.bump(`[${copyIdx}/${n}] A copiar ${base} para ${subFolderName}…`);
       vcProgress.setItem(itemId, { state: 'copy', detail: 'a escrever bytes' });
       try {
-        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, entry.relPath);
+        const { fileHandle, fileName } = await getFileFromPath(vaultHandle, entry.relPath, vaultLayout);
         const file = await fileHandle.getFile();
         const newHandle = await subDest.getFileHandle(fileName, { create: true });
         const writable = await newHandle.createWritable();
@@ -3462,11 +3592,12 @@ A seção 2 (TRANSCRIÇÕES) traz o conteúdo cru de cada conversa, identificado
     if (!confirm('Apagar pastas salvas (vault e destino)? A próxima abertura vai pedir pra selecionar de novo.')) return;
     try {
       await idbDelete('vault');
+      await idbDelete('vaultLayout');
       await idbDelete('dest');
       await idbDelete('destAbsPath');
       await idbDelete('lastDestFullPath');
     } catch { /* ignore */ }
-    vaultHandle = null; destHandle = null;
+    vaultHandle = null; vaultLayout = null; destHandle = null;
     lastDestSubfolder = null;
     lastDestFullPath = null;
     applyVcDefaults();
@@ -3479,7 +3610,7 @@ A seção 2 (TRANSCRIÇÕES) traz o conteúdo cru de cada conversa, identificado
   (async () => {
     try {
       const savedVault = await idbGet('vault');
-      if (savedVault) {
+      if (savedVault && !vaultHandle) {
         vaultHandle = savedVault;
         $('vc-path-vault').textContent = savedVault.name;
         $('vc-path-vault').classList.remove('empty');
@@ -3490,6 +3621,16 @@ A seção 2 (TRANSCRIÇÕES) traz o conteúdo cru de cada conversa, identificado
           setStatus('vc-status-vault', '⏳ autorizar', 'warn');
           $('vc-path-vault').innerHTML = `${savedVault.name} <span class="vc-pill">restaurado</span>`;
         }
+      }
+      if (vaultHandle) {
+        const savedLayout = await idbGet('vaultLayout');
+        if (savedLayout && savedLayout.name === vaultHandle.name) {
+          vaultLayout = savedLayout;
+        } else if (await vaultHandle.queryPermission({ mode: 'read' }) === 'granted') {
+          vaultLayout = await detectVaultLayout(vaultHandle);
+          await idbSet('vaultLayout', { name: vaultHandle.name, ...vaultLayout });
+        }
+        updateVaultLayoutHint();
       }
       const savedDest = await idbGet('dest');
       if (savedDest) {
