@@ -11,6 +11,8 @@ import { spawn } from 'node:child_process';
 
 const PORT = Number(process.env.PORT || 5380);
 const HOST = '127.0.0.1';
+const CONFIG_DIR = path.join(process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local'), 'import-obsidian');
+const DEST_BASE_FILE = path.join(CONFIG_DIR, 'dest-base.txt');
 
 function corsHeaders(extra = {}) {
   return {
@@ -32,6 +34,28 @@ function normalizeFolder(raw) {
   const normalized = path.normalize(decodeURIComponent(raw.trim()));
   if (!path.isAbsolute(normalized)) return null;
   return normalized;
+}
+
+function ensureConfigDir() {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+}
+
+function readDestBase() {
+  try {
+    if (!fs.existsSync(DEST_BASE_FILE)) return null;
+    const value = fs.readFileSync(DEST_BASE_FILE, 'utf8').trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDestBase(rawPath) {
+  const folder = normalizeFolder(rawPath);
+  if (!folder) return { ok: false, error: 'basePath absoluto obrigatório' };
+  ensureConfigDir();
+  fs.writeFileSync(DEST_BASE_FILE, folder, 'utf8');
+  return { ok: true, basePath: folder };
 }
 
 function openInExplorer(folderPath) {
@@ -103,7 +127,23 @@ const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url || '/', `http://${HOST}`);
 
   if (req.method === 'GET' && reqUrl.pathname === '/api/health') {
-    sendJson(res, 200, { ok: true, service: 'folder-opener', port: PORT });
+    sendJson(res, 200, { ok: true, service: 'folder-opener', port: PORT, destBase: readDestBase() });
+    return;
+  }
+
+  if (req.method === 'GET' && reqUrl.pathname === '/api/dest-base') {
+    sendJson(res, 200, { ok: true, basePath: readDestBase() });
+    return;
+  }
+
+  if (req.method === 'POST' && reqUrl.pathname === '/api/dest-base') {
+    try {
+      const { basePath } = await readJsonBody(req);
+      const result = writeDestBase(basePath);
+      sendJson(res, result.ok ? 200 : 400, result);
+    } catch (e) {
+      sendJson(res, 500, { ok: false, error: String(e.message || e) });
+    }
     return;
   }
 
